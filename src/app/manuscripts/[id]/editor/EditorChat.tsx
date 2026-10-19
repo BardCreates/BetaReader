@@ -32,7 +32,11 @@ export function EditorChat(props: {
   const [error, setError] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [messages]);
+  // Block body on purpose: newer browsers return a Promise from scrollIntoView, and
+  // React treats any non-function return value from an effect as an error.
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages]);
 
   async function send(text: string) {
     const message = text.trim();
