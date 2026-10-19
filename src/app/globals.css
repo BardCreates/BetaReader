@@ -64,3 +64,41 @@ mark.note[data-kind="PRAISE"] { background: var(--color-praise-soft); border-bot
 mark.note[data-kind="REACTION"] { background: var(--color-reaction-soft); border-bottom: 2px solid var(--color-reaction); }
 mark.note[data-dim="true"] { background: transparent; border-bottom-style: dotted; }
 mark.note[data-active="true"] { outline-color: var(--color-accent); }
+
+/* ─── Chapter editor ─────────────────────────────────────────── */
+.editor-body {
+  min-height: 60vh;
+  outline: none;
+  white-space: pre-wrap;
+}
+.editor-body p {
+  margin: 0;
+}
+.editor-body p + p {
+  margin-top: 1em;
+}
+.editor-body hr {
+  border: 0;
+  margin: 1.6em 0;
+  height: auto;
+  text-align: center;
+  overflow: visible;
+  cursor: pointer;
+}
+.editor-body hr::before {
+  content: "* * *";
+  color: var(--color-muted);
+  letter-spacing: 0.6em;
+}
+.editor-body hr.ProseMirror-selectednode {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.editor-body p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

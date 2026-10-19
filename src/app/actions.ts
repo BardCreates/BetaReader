@@ -5,12 +5,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser, signOut } from "@/auth";
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { extractText } from "@/lib/manuscript/import";
+import { findQuote } from "@/lib/manuscript/anchor";
+import { docToPlain, plainToDoc, sanitizeDoc } from "@/lib/manuscript/doc";
 import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
 import { planFor } from "@/lib/plans";
 import { PERSONAS } from "@/lib/reader/personas";
-import { claimManuscript, readManuscript, rereadChapter } from "@/lib/reader/pipeline";
+import { MIN_WORDS_TO_READ, claimManuscript, readManuscript, rereadChapter } from "@/lib/reader/pipeline";
 
 export type FormState = { error?: string } | undefined;
 
@@ -90,41 +93,127 @@ export async function startReading(manuscriptId: string, fresh = false) {
   revalidatePath(`/manuscripts/${manuscriptId}`);
 }
 
+// ─── Chapter editing ─────────────────────────────────────────────
 // Server actions can be called with any arguments, so validate them at runtime.
-const ReviseInput = z.object({ chapterId: z.string().min(1), content: z.string().max(400_000) });
 
-export async function reviseChapter(chapterId: string, content: string): Promise<FormState> {
-  const user = await requireUser();
-  const input = ReviseInput.safeParse({ chapterId, content });
-  if (!input.success) return { error: "That revision couldn't be saved." };
-
-  const chapter = await db.chapter.findFirst({
-    where: { id: input.data.chapterId, manuscript: { userId: user.id } },
-    include: { review: { select: { status: true } }, manuscript: { select: { id: true, status: true } } },
+async function ownedChapter(chapterId: unknown, userId: string) {
+  if (typeof chapterId !== "string" || !chapterId) return null;
+  return db.chapter.findFirst({
+    where: { id: chapterId, manuscript: { userId } },
+    include: { review: { select: { id: true, status: true } }, manuscript: { select: { id: true, status: true } } },
   });
-  if (!chapter) return { error: "Chapter not found." };
-  if (["QUEUED", "READING"].includes(chapter.manuscript.status) || ["QUEUED", "READING"].includes(chapter.review?.status ?? "")) {
-    return { error: "The reader is still working. Revise once the current read finishes." };
+}
+
+const MAX_CHAPTER_CHARS = 400_000;
+
+export type SaveResult = { ok: true; wordCount: number; savedAt: string } | { ok: false; error: string };
+
+/** Autosave from the editor: store the formatted document and its plain text. */
+export async function saveChapter(chapterId: string, rawDoc: unknown): Promise<SaveResult> {
+  const user = await requireUser();
+  const chapter = await ownedChapter(chapterId, user.id);
+  if (!chapter) return { ok: false, error: "Chapter not found." };
+
+  let doc;
+  try {
+    doc = sanitizeDoc(rawDoc);
+  } catch {
+    return { ok: false, error: "That change couldn't be saved." };
   }
-
-  const text = input.data.content.replace(/\r\n?/g, "\n").trim();
+  const text = docToPlain(doc);
+  if (text.length > MAX_CHAPTER_CHARS) return { ok: false, error: "This chapter is too long to save. Try splitting it." };
   const words = countWords(text);
-  if (words < 20) return { error: "The revised chapter is too short." };
+  const changed = text !== chapter.content;
+  const now = new Date();
 
-  await db.$transaction([
-    db.chapter.update({ where: { id: chapter.id }, data: { content: text, wordCount: words } }),
+  const ops: Prisma.PrismaPromise<unknown>[] = [
+    db.chapter.update({
+      where: { id: chapter.id },
+      data: { doc: doc as object, content: text, wordCount: words, ...(changed ? { contentUpdatedAt: now } : {}) },
+    }),
     db.manuscript.update({
       where: { id: chapter.manuscript.id },
       data: { wordCount: { increment: words - chapter.wordCount } },
     }),
-    db.chapterReview.upsert({
-      where: { chapterId: chapter.id },
-      update: { status: "QUEUED", error: null },
-      create: { chapterId: chapter.id, status: "QUEUED" },
-    }),
+  ];
+
+  // Keep stored note positions pointing at the right passages in the new text.
+  if (changed && chapter.review) {
+    const notes = await db.note.findMany({ where: { reviewId: chapter.review.id }, select: { id: true, quote: true, startOffset: true } });
+    for (const n of notes) {
+      const a = findQuote(text, n.quote, n.startOffset ?? 0);
+      ops.push(db.note.update({ where: { id: n.id }, data: { startOffset: a?.start ?? null, endOffset: a?.end ?? null } }));
+    }
+  }
+  await db.$transaction(ops);
+  return { ok: true, wordCount: words, savedAt: now.toISOString() };
+}
+
+export async function renameChapter(chapterId: string, title: string): Promise<FormState> {
+  const user = await requireUser();
+  const chapter = await ownedChapter(chapterId, user.id);
+  const clean = typeof title === "string" ? title.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+  if (!chapter) return { error: "Chapter not found." };
+  if (!clean) return { error: "Give the chapter a title." };
+  await db.chapter.update({ where: { id: chapter.id }, data: { title: clean } });
+  revalidatePath(`/manuscripts/${chapter.manuscript.id}`, "layout");
+  return undefined;
+}
+
+export async function addChapter(manuscriptId: string) {
+  const user = await requireUser();
+  const ms = await db.manuscript.findFirst({
+    where: { id: manuscriptId, userId: user.id },
+    select: { id: true, _count: { select: { chapters: true } } },
+  });
+  if (!ms) return;
+  const index = ms._count.chapters;
+  await db.chapter.create({
+    data: { manuscriptId: ms.id, index, title: `Chapter ${index + 1}`, content: "", wordCount: 0, doc: plainToDoc("") as object },
+  });
+  revalidatePath(`/manuscripts/${ms.id}`, "layout");
+  redirect(`/manuscripts/${ms.id}/chapters/${index + 1}`);
+}
+
+export async function deleteChapter(chapterId: string) {
+  const user = await requireUser();
+  const chapter = await ownedChapter(chapterId, user.id);
+  if (!chapter) return;
+  const msId = chapter.manuscript.id;
+  const later = await db.chapter.findMany({
+    where: { manuscriptId: msId, index: { gt: chapter.index } },
+    orderBy: { index: "asc" },
+    select: { id: true, index: true },
+  });
+  await db.$transaction([
+    db.chapter.delete({ where: { id: chapter.id } }),
+    db.manuscript.update({ where: { id: msId }, data: { wordCount: { decrement: chapter.wordCount } } }),
+    // Close the gap one row at a time, in order, so the (manuscript, index) uniqueness never clashes.
+    ...later.map((c) => db.chapter.update({ where: { id: c.id }, data: { index: c.index - 1 } })),
   ]);
+  revalidatePath(`/manuscripts/${msId}`, "layout");
+  redirect(`/manuscripts/${msId}`);
+}
+
+/** Get fresh feedback on one chapter after editing it. */
+export async function rereadChapterNow(chapterId: string): Promise<FormState> {
+  const user = await requireUser();
+  const chapter = await ownedChapter(chapterId, user.id);
+  if (!chapter) return { error: "Chapter not found." };
+  if (["QUEUED", "READING"].includes(chapter.manuscript.status)) {
+    return { error: "The reader is working through the whole book right now. It will get to this chapter." };
+  }
+  if (["QUEUED", "READING"].includes(chapter.review?.status ?? "")) return undefined; // already re-reading
+  if (chapter.wordCount < MIN_WORDS_TO_READ) {
+    return { error: `Write at least ${MIN_WORDS_TO_READ} words before asking for a read.` };
+  }
+  await db.chapterReview.upsert({
+    where: { chapterId: chapter.id },
+    update: { status: "QUEUED", error: null },
+    create: { chapterId: chapter.id, status: "QUEUED" },
+  });
   after(() => rereadChapter(chapter.id));
-  revalidatePath(`/manuscripts/${chapter.manuscript.id}/chapters/${chapter.index + 1}`);
+  revalidatePath(`/manuscripts/${chapter.manuscript.id}`, "layout");
   return undefined;
 }
 
@@ -141,8 +230,7 @@ export async function setNoteStatus(noteId: string, rawStatus: "OPEN" | "RESOLVE
   });
   if (!note) return;
   await db.note.update({ where: { id: noteId }, data: { status } });
-  const ch = note.review.chapter;
-  revalidatePath(`/manuscripts/${ch.manuscriptId}/chapters/${ch.index + 1}`);
+  revalidatePath(`/manuscripts/${note.review.chapter.manuscriptId}`, "layout");
 }
 
 export async function deleteManuscript(manuscriptId: string) {

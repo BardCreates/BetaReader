@@ -16,6 +16,15 @@ const KIND: Record<"reaction" | "praise" | "issue", NoteKind> = {
  * Claim a manuscript for reading. Returns false if a read is already running,
  * so double-clicks and concurrent requests don't start two readers.
  */
+/** Chapters shorter than this are skipped (e.g. a new chapter the author hasn't written yet). */
+export const MIN_WORDS_TO_READ = 50;
+
+/** Notes are out of date when the chapter's text changed after its read started. */
+export function isReviewStale(review: { status: string; readAt: Date | null; updatedAt: Date } | null, contentUpdatedAt: Date) {
+  if (!review || review.status !== "DONE") return false;
+  return contentUpdatedAt.getTime() > (review.readAt ?? review.updatedAt).getTime();
+}
+
 export async function claimManuscript(manuscriptId: string, userId: string): Promise<boolean> {
   const { count } = await db.manuscript.updateMany({
     where: {
@@ -77,6 +86,7 @@ export async function readManuscript(manuscriptId: string) {
         memory = chapter.review.memory;
         continue;
       }
+      if (chapter.wordCount < MIN_WORDS_TO_READ) continue; // nothing to read yet
       // Heartbeat so a dead read can be detected and resumed (see claimManuscript).
       await db.manuscript.update({ where: { id: ms.id }, data: { updatedAt: new Date() } });
       memory = await readChapter({ system, chapter, total: ms.chapters.length, memory });
@@ -138,6 +148,7 @@ async function readChapter(args: {
   memory: string | null;
 }): Promise<string> {
   const { chapter } = args;
+  const readAt = new Date();
   const review = await db.chapterReview.upsert({
     where: { chapterId: chapter.id },
     update: { status: "READING", error: null },
@@ -149,17 +160,19 @@ async function readChapter(args: {
       system: args.system,
       user: chapterUserPrompt({ index: chapter.index, total: args.total, title: chapter.title, content: chapter.content, memory: args.memory }),
       schema: chapterFeedbackTool.input_schema,
-      // Roughly: notes + reaction + memory. Long chapters get more room.
       // Headroom for the model's reasoning plus notes, reaction and memory.
       maxTokens: Math.min(32_000, 16_000 + Math.round(chapter.wordCount / 2)),
       parse: (input) => ChapterFeedbackSchema.parse(input),
     });
 
-    // Anchor each note to the passage it quotes. Search near the previous note so
-    // repeated phrases resolve to the right occurrence.
+    // Anchor each note to the passage it quotes, in the chapter's text as it is *now*
+    // (the author may have kept editing while the reader worked). Search near the previous
+    // note so repeated phrases resolve to the right occurrence.
+    const current = await db.chapter.findUnique({ where: { id: chapter.id }, select: { content: true } });
+    const text = current?.content ?? chapter.content;
     let hint = 0;
     const notes: Prisma.NoteCreateManyInput[] = data.notes.map((n) => {
-      const anchor = findQuote(chapter.content, n.quote, hint);
+      const anchor = findQuote(text, n.quote, hint);
       if (anchor) hint = anchor.start;
       return {
         reviewId: review.id,
@@ -181,6 +194,7 @@ async function readChapter(args: {
         where: { id: review.id },
         data: {
           status: "DONE",
+          readAt,
           reaction: data.reaction,
           summary: data.summary,
           engagement: data.engagement,

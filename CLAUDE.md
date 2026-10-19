@@ -11,3 +11,5 @@ AI beta reader for authors. Next.js 16 App Router + Prisma 7/Postgres + Auth.js 
 - Prisma 7: the client is generated into `src/generated/prisma` (gitignored; `npm install` runs `prisma generate`). Import types and the client from `@/generated/prisma/client`, never `@prisma/client`. The DB connection goes through `@prisma/adapter-pg` in `src/lib/db.ts`.
 - The dev email login only exists when `AUTH_DEV_LOGIN=true` and `NODE_ENV` is not production (`next dev`), by design.
 - Editor chat is switched off for v1 via `FEATURES.editorChat` in `src/lib/features.ts` (the user wants v1 focused on the read itself). Keep its code working, but don't surface it unless asked.
+- Chapters: `Chapter.doc` is the TipTap/ProseMirror JSON the editor saves; `Chapter.content` is the plain text derived from it (`docToPlain`) that the AI reads and notes anchor to. Always write both together (see `saveChapter`). `contentUpdatedAt` vs `ChapterReview.readAt` decides whether notes are out of date (`isReviewStale`).
+- Editor allows only paragraphs, hard breaks, scene breaks (horizontalRule), bold and italic; `sanitizeDoc` enforces this server-side.

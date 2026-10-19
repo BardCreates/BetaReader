@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "10mb" },
   },
   serverExternalPackages: ["mammoth"],
+  // Keep the dev-mode badge clear of the sidebar's account links.
+  devIndicators: { position: "bottom-right" },
 };
 
 export default nextConfig;

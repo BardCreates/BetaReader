@@ -18,7 +18,7 @@ upload (.docx/.txt/.md or paste)
 - **Anchored notes.** The model quotes passages; `src/lib/manuscript/anchor.ts` finds them in the text, tolerating curly/straight quotes, dashes, whitespace and ellipses, so they can be highlighted inline.
 - **Personas.** Genre reader, developmental editor, or line editor (`src/lib/reader/personas.ts`). Same honesty rules, different lens.
 - **Editor chat (off in v1).** Switched off in `src/lib/features.ts` to keep v1 focused on the read; flip `editorChat` to bring it back. Streams replies with the book report, chapter summaries and (for chapter conversations) the full chapter text and notes in context (`src/lib/reader/editor.ts`).
-- **Revise & re-read.** Edit a chapter in the app and it's re-read with the memory from the chapter before it.
+- **Write in the app.** A left menu lists every chapter like a book outline. Each chapter opens in an editor (paragraphs, bold, italic, scene breaks) that autosaves. The reader's notes stay beside the text and their highlights follow your edits; chapters you've changed since their last read are marked, and **Re-read this chapter** gets fresh feedback when you're ready. Chapters are stored as formatted documents (`Chapter.doc`) with a plain-text copy (`Chapter.content`) that the AI reads and notes anchor to — see `src/lib/manuscript/doc.ts`.
 
 ## Stack
 

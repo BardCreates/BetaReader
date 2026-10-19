@@ -103,9 +103,11 @@ model Chapter {
   manuscriptId String
   index        Int      // 0-based reading order
   title        String
-  content      String   @db.Text
+  content      String   @db.Text // plain text: what the AI reads and notes anchor to (derived from `doc`)
+  doc          Json?    // formatted document (TipTap/ProseMirror JSON); null for chapters not yet opened in the editor
   wordCount    Int
   createdAt    DateTime @default(now())
+  contentUpdatedAt DateTime @default(now()) // last time the text changed
 
   manuscript    Manuscript     @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
   review        ChapterReview?
@@ -128,6 +130,7 @@ model ChapterReview {
   questions  Json?         // string[] — open questions the reader is carrying
   predictions Json?        // string[] — what the reader thinks will happen
   memory     String?       @db.Text // running "reader memory" handed to the next chapter
+  readAt     DateTime?     // when the read started; content edited after this means the notes are out of date
 
   model        String?
   inputTokens  Int @default(0)

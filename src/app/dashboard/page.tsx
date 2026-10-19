@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { requireUser } from "@/auth";
-import { AppHeader } from "@/components/AppHeader";
+import { AppShell } from "@/components/AppShell";
 import { buttonClass, Card, StatusBadge } from "@/components/ui";
 import { db } from "@/lib/db";
 import { personaFor } from "@/lib/reader/personas";
+import { getSidebar } from "@/lib/sidebar";
 
 export const metadata = { title: "Your manuscripts" };
 
@@ -15,10 +16,11 @@ export default async function Dashboard() {
     include: { _count: { select: { chapters: true } }, report: { select: { content: true, status: true } } },
   });
 
+  const sidebar = (await getSidebar(user.id))!;
+
   return (
-    <>
-      <AppHeader email={user.email} />
-      <main className="mx-auto max-w-6xl px-4 py-10">
+    <AppShell email={user.email} sidebar={sidebar}>
+      <main className="mx-auto max-w-5xl px-4 py-10 sm:px-8">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
             <h1 className="font-serif text-3xl font-semibold">Your manuscripts</h1>
@@ -64,6 +66,6 @@ export default async function Dashboard() {
           </ul>
         )}
       </main>
-    </>
+    </AppShell>
   );
 }

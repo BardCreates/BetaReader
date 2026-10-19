@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/auth";
 import { deleteManuscript, startReading } from "@/app/actions";
-import { AppHeader } from "@/components/AppHeader";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { SubmitButton } from "@/components/SubmitButton";
 import { buttonClass, Card, EngagementStrip, ghostButtonClass, StatusBadge } from "@/components/ui";
@@ -50,8 +49,7 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
   return (
     <>
       <AutoRefresh active={busy} />
-      <AppHeader email={user.email} crumbs={[{ href: base, label: ms.title }]} />
-      <main className="mx-auto max-w-6xl px-4 py-10">
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
@@ -124,29 +122,6 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
                 />
               </Card>
             )}
-            <Card className="p-0">
-              <p className="border-b border-line px-5 py-3 text-sm font-medium">Chapters</p>
-              <ol className="divide-y divide-line">
-                {ms.chapters.map((c) => (
-                  <li key={c.id}>
-                    <Link href={`${base}/chapters/${c.index + 1}`} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-line/30">
-                      <span className="w-6 text-right text-muted tabular-nums">{c.index + 1}</span>
-                      <span className="min-w-0 flex-1 truncate">{c.title}</span>
-                      {c.review?.status === "DONE" ? (
-                        <span className="flex items-center gap-2 text-xs text-muted tabular-nums">
-                          {c.review._count.notes > 0 && <span className="text-issue">{c.review._count.notes} open</span>}
-                          <span>{c.review.engagement}/10</span>
-                        </span>
-                      ) : c.review ? (
-                        <StatusBadge status={c.review.status} />
-                      ) : (
-                        <span className="text-xs text-muted tabular-nums">{c.wordCount.toLocaleString()}w</span>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            </Card>
             <form action={deleteManuscript.bind(null, ms.id)}>
               <SubmitButton className="text-xs text-muted hover:text-accent" confirm="Delete this manuscript and all its feedback?">
                 Delete manuscript
