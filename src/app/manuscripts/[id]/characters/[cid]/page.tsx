@@ -35,7 +35,7 @@ export default async function CharacterPage({
   const base = `/manuscripts/${c.manuscript.id}/characters/${c.id}`;
 
   return (
-    <main className="grid max-w-7xl gap-8 px-4 py-8 sm:px-8 lg:px-12 lg:grid-cols-[20rem_minmax(0,1fr)]">
+    <main className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-8 lg:px-12 lg:grid-cols-[20rem_minmax(0,1fr)]">
       <div className="space-y-6">
         <Link href={`/manuscripts/${c.manuscript.id}/characters`} className="text-sm text-muted hover:text-ink">
           ← All characters

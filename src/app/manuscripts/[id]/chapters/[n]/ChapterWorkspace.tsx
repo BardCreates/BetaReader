@@ -245,12 +245,14 @@ export function ChapterWorkspace(p: Props) {
             )}
             <span className="ml-auto text-muted transition group-open:rotate-180">▾</span>
           </summary>
-          <div className="grid gap-x-10 gap-y-5 border-t border-line px-5 py-4 md:grid-cols-[minmax(0,68ch)_16rem]">
-            <Prose text={p.review.reaction} className="max-w-[68ch]" />
-            <div className="text-sm">
-              <p className="text-muted">What I understood happened</p>
-              <p className="mt-1">{p.review.summary}</p>
+          <div className="grid border-t border-line xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <div className="px-5 py-5 sm:px-10">
+              <Prose text={p.review.reaction} className="mx-auto max-w-[46rem]" />
             </div>
+            <aside className="border-t border-line bg-paper/60 px-5 py-5 text-sm xl:rounded-br-xl xl:border-t-0 xl:border-l">
+              <p className="font-medium text-muted">What I understood happened</p>
+              <p className="mt-2 leading-relaxed">{p.review.summary}</p>
+            </aside>
           </div>
         </details>
       )}

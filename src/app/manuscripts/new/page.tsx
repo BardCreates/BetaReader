@@ -11,7 +11,7 @@ export default async function NewManuscriptPage() {
   const personas = Object.entries(PERSONAS).map(([id, p]) => ({ id, label: p.label, short: p.short }));
   return (
     <AppShell email={user.email} sidebar={(await getSidebar(user.id))!}>
-      <main className="max-w-3xl px-4 py-10 sm:px-8 lg:px-12">
+      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-8 lg:px-12">
         <h1 className="font-serif text-3xl font-semibold">New manuscript</h1>
         <p className="mt-1 text-muted">
           Upload your draft or paste it in. We’ll split it into chapters using your chapter headings.

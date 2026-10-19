@@ -50,7 +50,7 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
   return (
     <>
       <AutoRefresh active={busy} />
-      <main className="max-w-6xl px-4 py-10 sm:px-8 lg:px-12">
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-8 lg:px-12">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
