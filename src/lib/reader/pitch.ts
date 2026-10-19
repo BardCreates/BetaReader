@@ -23,7 +23,10 @@ export async function writePitchKit(manuscriptId: string, reservation: Reservati
       chapters: { orderBy: { index: "asc" }, select: { index: true, title: true, content: true, review: { select: { summary: true, memory: true } } } },
     },
   });
-  if (!ms) return;
+  if (!ms) {
+    await release(reservation).catch(() => {});
+    return;
+  }
   const report = ms.report?.status === "DONE" ? (ms.report.content as BookReportContent) : null;
   const words = ms.chapters.reduce((sum, c) => sum + countWords(c.content), 0);
   const finalMemory = ms.chapters.findLast((c) => c.review?.memory)?.review?.memory ?? "";

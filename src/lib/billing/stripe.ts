@@ -16,7 +16,7 @@ export const PRODUCTS = {
 
 export type ProductKey = keyof typeof PRODUCTS;
 
-export const isProductKey = (v: unknown): v is ProductKey => typeof v === "string" && v in PRODUCTS;
+export const isProductKey = (v: unknown): v is ProductKey => typeof v === "string" && Object.hasOwn(PRODUCTS, v);
 
 export function priceId(product: ProductKey): string | null {
   return process.env[PRODUCTS[product].env] || null;

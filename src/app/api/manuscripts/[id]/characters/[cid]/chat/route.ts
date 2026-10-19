@@ -2,7 +2,7 @@ import { APIUserAbortError } from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { currentUserId } from "@/auth";
 import { streamUsageTracker } from "@/lib/billing/streamUsage";
-import { isLimitError, recordAiUsage, release, reserve, type Reservation } from "@/lib/billing/usage";
+import { estimateMicros, holdCost, isLimitError, release, reserve, settleCost, type Reservation } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
 import { FEATURES } from "@/lib/features";
 import { MODEL, anthropic } from "@/lib/reader/anthropic";
@@ -42,34 +42,48 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     throw err;
   }
 
-  let conversation = parsed.data.conversationId
-    ? await db.conversation.findFirst({ where: { id: parsed.data.conversationId, characterId: character.id } })
-    : null;
-  if (!conversation) {
-    const total = character.manuscript._count.chapters;
-    const asOf = parsed.data.asOfChapter && parsed.data.asOfChapter < total ? parsed.data.asOfChapter : null;
-    conversation = await db.conversation.create({
-      data: { manuscriptId, characterId: character.id, asOfChapter: asOf, title: message.slice(0, 80) },
-    });
+  // Everything up to the start of the reply: if any of it fails, give the message back.
+  let prepared;
+  try {
+    prepared = await (async () => {
+      let conversation = parsed.data.conversationId
+        ? await db.conversation.findFirst({ where: { id: parsed.data.conversationId, characterId: character.id } })
+        : null;
+      if (!conversation) {
+        const total = character.manuscript._count.chapters;
+        const asOf = parsed.data.asOfChapter && parsed.data.asOfChapter < total ? parsed.data.asOfChapter : null;
+        conversation = await db.conversation.create({
+          data: { manuscriptId, characterId: character.id, asOfChapter: asOf, title: message.slice(0, 80) },
+        });
+      }
+
+      // Most recent 40 messages, oldest first, starting on a user turn.
+      const history = (
+        await db.message.findMany({ where: { conversationId: conversation.id }, orderBy: { createdAt: "desc" }, take: 40 })
+      ).reverse();
+      while (history[0]?.role === "assistant") history.shift();
+      await db.message.create({ data: { conversationId: conversation.id, role: "user", content: message } });
+
+      const system = await characterSystemPrompt(character.id, conversation.asOfChapter);
+      const conversationId = conversation.id;
+
+      // Hold the reply's worst-case cost against the spend ceiling before calling.
+      const hold = await holdCost(userId, estimateMicros(MODEL, system.length + message.length + history.reduce((n, m) => n + m.content.length, 0), 4096));
+      const stream = anthropic().messages.stream({
+        model: MODEL,
+        max_tokens: 4096,
+        // The passages are the same every turn, so cache them.
+        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+        messages: [...history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })), { role: "user" as const, content: message }],
+      });
+      return { conversationId, stream, hold };
+    })();
+  } catch (err) {
+    await release(reservation).catch(() => {});
+    if (isLimitError(err)) return new Response(err.message, { status: 429 });
+    throw err;
   }
-
-  // Most recent 40 messages, oldest first, starting on a user turn.
-  const history = (
-    await db.message.findMany({ where: { conversationId: conversation.id }, orderBy: { createdAt: "desc" }, take: 40 })
-  ).reverse();
-  while (history[0]?.role === "assistant") history.shift();
-  await db.message.create({ data: { conversationId: conversation.id, role: "user", content: message } });
-
-  const system = await characterSystemPrompt(character.id, conversation.asOfChapter);
-  const conversationId = conversation.id;
-
-  const stream = anthropic().messages.stream({
-    model: MODEL,
-    max_tokens: 4096,
-    // The passages are the same every turn, so cache them.
-    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-    messages: [...history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })), { role: "user" as const, content: message }],
-  });
+  const { conversationId, stream, hold } = prepared;
 
   const tracker = streamUsageTracker();
   const encoder = new TextEncoder();
@@ -101,7 +115,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
       } finally {
         // Bill what the reply actually used; if nothing came back, give the message back.
-        if (tracker.any) await recordAiUsage({ userId, manuscriptId, kind: "chat" }, MODEL, tracker.usage).catch((e) => console.error("usage", e));
+        await settleCost(hold, { userId, manuscriptId, kind: "chat" }, MODEL, tracker.any ? tracker.usage : null).catch((e) => console.error("usage", e));
         if (!tracker.usage.output) await release(reservation).catch(() => {});
         if (full) {
           await db.message.create({ data: { conversationId, role: "assistant", content: full } });

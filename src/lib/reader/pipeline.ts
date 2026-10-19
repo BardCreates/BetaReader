@@ -27,29 +27,33 @@ export function isReviewStale(review: { status: string; readAt: Date | null; upd
  * readers. One read at a time per user: "otherBusy" if another of their books is being read.
  */
 export async function claimManuscript(manuscriptId: string, userId: string): Promise<"claimed" | "busy" | "otherBusy"> {
-  const other = await db.manuscript.findFirst({
-    where: {
-      userId,
-      id: { not: manuscriptId },
-      status: { in: ["QUEUED", "READING"] },
-      updatedAt: { gte: new Date(Date.now() - STALE_READ_MS) },
-    },
-    select: { id: true },
+  // Lock the user's row so two books started at the same moment can't both be claimed.
+  return db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+    const other = await tx.manuscript.findFirst({
+      where: {
+        userId,
+        id: { not: manuscriptId },
+        status: { in: ["QUEUED", "READING"] },
+        updatedAt: { gte: new Date(Date.now() - STALE_READ_MS) },
+      },
+      select: { id: true },
+    });
+    if (other) return "otherBusy";
+    const { count } = await tx.manuscript.updateMany({
+      where: {
+        id: manuscriptId,
+        userId,
+        OR: [
+          { status: { notIn: ["QUEUED", "READING"] } },
+          // A read whose process died (restart, serverless timeout) can be reclaimed.
+          { updatedAt: { lt: new Date(Date.now() - STALE_READ_MS) } },
+        ],
+      },
+      data: { status: "QUEUED", error: null, errorCode: null },
+    });
+    return count === 1 ? "claimed" : "busy";
   });
-  if (other) return "otherBusy";
-  const { count } = await db.manuscript.updateMany({
-    where: {
-      id: manuscriptId,
-      userId,
-      OR: [
-        { status: { notIn: ["QUEUED", "READING"] } },
-        // A read whose process died (restart, serverless timeout) can be reclaimed.
-        { updatedAt: { lt: new Date(Date.now() - STALE_READ_MS) } },
-      ],
-    },
-    data: { status: "QUEUED", error: null, errorCode: null },
-  });
-  return count === 1 ? "claimed" : "busy";
 }
 
 /** A read that hasn't made progress in this long is considered dead. Each chapter touches updatedAt. */
@@ -128,6 +132,15 @@ export async function readManuscript(manuscriptId: string, opts: { rereadChanged
  * the chapter before it. The book report is left as-is (the author can re-run the full read).
  */
 export async function rereadChapter(chapterId: string, reservation: Reservation | null) {
+  try {
+    await rereadChapterInner(chapterId);
+  } catch {
+    // The read failed (readChapter recorded why on the review); give the words back.
+    await release(reservation).catch(() => {});
+  }
+}
+
+async function rereadChapterInner(chapterId: string) {
   const chapter = await db.chapter.findUniqueOrThrow({
     where: { id: chapterId },
     include: { manuscript: { include: { _count: { select: { chapters: true } } } } },
@@ -148,19 +161,14 @@ export async function rereadChapter(chapterId: string, reservation: Reservation 
     persona: ms.persona,
     chapterCount: ms._count.chapters,
   };
-  try {
-    await readChapter({
-      system: [{ type: "text", text: readerSystemPrompt(ctx), cache_control: { type: "ephemeral" } }],
-      chapter,
-      total: ms._count.chapters,
-      memory: previous?.review?.memory ?? null,
-      meter: { userId: ms.userId, manuscriptId: ms.id },
-    });
-    await db.user.update({ where: { id: ms.userId }, data: { wordsReadTotal: { increment: chapter.wordCount } } });
-  } catch {
-    // readChapter already recorded the error on the review; give the words back.
-    await release(reservation).catch(() => {});
-  }
+  await readChapter({
+    system: [{ type: "text", text: readerSystemPrompt(ctx), cache_control: { type: "ephemeral" } }],
+    chapter,
+    total: ms._count.chapters,
+    memory: previous?.review?.memory ?? null,
+    meter: { userId: ms.userId, manuscriptId: ms.id },
+  });
+  await db.user.update({ where: { id: ms.userId }, data: { wordsReadTotal: { increment: chapter.wordCount } } });
 }
 
 type ChapterToRead = {

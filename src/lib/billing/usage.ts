@@ -3,7 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { planFor } from "@/lib/plans";
 import { costMicros, type TokenUsage } from "./cost";
-import { PASS_FIELD, USED_FIELD, applyCost, canSpend, remaining, rollPeriod, split, type Metric, type UsageRow } from "./period";
+import { PASS_FIELD, USED_FIELD, applyCost, canSpend, costCapMicros, remaining, rollPeriod, split, type Metric, type UsageRow } from "./period";
 
 export type { Metric } from "./period";
 
@@ -77,7 +77,13 @@ function spendMessage(u: UsageRow) {
   return `Your account has reached its usage limit for this period.${resets} Upgrade or buy a book pass to keep going.`;
 }
 
-export type Reservation = { userId: string; metric: Metric; fromPlan: number; fromPass: number };
+/** The reason a metric is used up, for pages that show it after a redirect. */
+export async function limitMessageFor(userId: string, metric: Metric) {
+  const u = await getUsage(userId);
+  return canSpend(u) ? limitMessage(u, metric, 1) : spendMessage(u);
+}
+
+export type Reservation = { userId: string; metric: Metric; fromPlan: number; fromPass: number; periodStart: Date };
 
 /**
  * Take `amount` from the user's allowance (plan first, then book pass) before doing the work.
@@ -95,19 +101,23 @@ export async function reserve(userId: string, metric: Metric, amount: number): P
       where: { id: userId },
       data: { [USED_FIELD[metric]]: { increment: s.fromPlan }, [PASS_FIELD[metric]]: { decrement: s.fromPass } },
     });
-    return { userId, metric, ...s };
+    return { userId, metric, ...s, periodStart: u.periodStart };
   });
 }
 
-/** Give back a reservation whose work didn't happen. */
+/**
+ * Give back a reservation whose work didn't happen. Pass credit always comes back; plan
+ * allowance only if it's still the same period (a new period already started from zero).
+ */
 export async function release(r: Reservation | null | undefined) {
   if (!r || (!r.fromPlan && !r.fromPass)) return;
   await db.$transaction(async (tx) => {
     const u = await lockUsage(tx, r.userId);
+    const samePeriod = u.periodStart.getTime() === r.periodStart.getTime();
     await tx.user.update({
       where: { id: r.userId },
       data: {
-        [USED_FIELD[r.metric]]: Math.max(0, u[USED_FIELD[r.metric]] - r.fromPlan),
+        ...(samePeriod ? { [USED_FIELD[r.metric]]: Math.max(0, u[USED_FIELD[r.metric]] - r.fromPlan) } : {}),
         [PASS_FIELD[r.metric]]: { increment: r.fromPass },
       },
     });
@@ -152,6 +162,72 @@ async function assertCapacity() {
 // ─── Cost ledger ────────────────────────────────────────────────
 
 export type Meter = { userId: string; kind?: string; manuscriptId?: string | null };
+
+/** A worst-case cost held against the spend ceiling while an AI call runs. */
+export type CostHold = { userId: string; micros: number; fromPass: number; periodStart: Date };
+
+/** Worst case for a call: every prompt character a token (well over the real ~4 chars/token is fine), full output. */
+export function estimateMicros(model: string, promptChars: number, maxTokens: number) {
+  return costMicros(model, { input: Math.ceil(promptChars / 3), output: maxTokens });
+}
+
+/**
+ * Hold a call's worst-case cost before making it, atomically. Concurrent calls each hold
+ * their own share, so together they can't pass the ceiling. Settle with the real cost after.
+ */
+export async function holdCost(userId: string, micros: number): Promise<CostHold> {
+  await assertCapacity();
+  return db.$transaction(async (tx) => {
+    const u = await lockUsage(tx, userId);
+    const after = applyCost(u, micros);
+    const fromPass = u.passCostMicros - after.passCostMicros;
+    // Allowed only if whatever goes over the plan ceiling is covered by pass credit.
+    const overflow = Math.max(0, u.costMicros + micros - Math.max(u.costMicros, costCapMicros(u.plan)));
+    if (overflow > u.passCostMicros) throw new LimitError(spendMessage(u));
+    await tx.user.update({ where: { id: userId }, data: after });
+    return { userId, micros, fromPass, periodStart: u.periodStart };
+  });
+}
+
+/** Replace a hold with the call's real cost (none if it failed before using anything), and log it. */
+export async function settleCost(hold: CostHold, meter: Meter, model: string, usage: TokenUsage | null) {
+  const actual = usage ? costMicros(model, usage) : 0;
+  await db.$transaction(async (tx) => {
+    const u = await lockUsage(tx, hold.userId);
+    if (usage) {
+      await tx.aiUsage.create({
+        data: {
+          userId: meter.userId,
+          manuscriptId: meter.manuscriptId ?? null,
+          kind: meter.kind ?? "other",
+          model,
+          inputTokens: usage.input,
+          outputTokens: usage.output,
+          cacheReadTokens: usage.cacheRead ?? 0,
+          cacheWriteTokens: usage.cacheWrite ?? 0,
+          costMicros: actual,
+        },
+      });
+    }
+    if (u.periodStart.getTime() !== hold.periodStart.getTime()) {
+      // The period rolled while the call ran: the hold was wiped with it; count the real cost now.
+      if (actual) await tx.user.update({ where: { id: hold.userId }, data: applyCost(u, actual) });
+      return;
+    }
+    const delta = actual - hold.micros;
+    if (delta > 0) {
+      await tx.user.update({ where: { id: hold.userId }, data: applyCost(u, delta) });
+    } else if (delta < 0) {
+      const refund = -delta;
+      await tx.user.update({
+        where: { id: hold.userId },
+        data: { costMicros: Math.max(0, u.costMicros - refund), passCostMicros: u.passCostMicros + Math.min(refund, hold.fromPass) },
+      });
+    }
+  });
+  if (budgetCache) budgetCache.micros += actual;
+  return actual;
+}
 
 /** Log an AI call with its real cost and count it against the user's spend ceiling. */
 export async function recordAiUsage(meter: Meter, model: string, usage: TokenUsage) {

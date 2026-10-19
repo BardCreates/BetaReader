@@ -25,7 +25,7 @@ export async function generatePitchKit(manuscriptId: string) {
     reservation = await reserve(user.id, "pitchKits", 1);
   } catch (err) {
     if (!isLimitError(err)) throw err;
-    redirect(`/manuscripts/${ms.id}/pitch?limit=${encodeURIComponent(err.message)}`);
+    redirect(`/manuscripts/${ms.id}/pitch?limit=1`);
   }
   await db.pitchKit.upsert({
     where: { manuscriptId: ms.id },

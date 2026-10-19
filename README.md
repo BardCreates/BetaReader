@@ -87,7 +87,7 @@ Plans live in `src/lib/plans.ts`: Free (10,000 words once), Author ($19/mo, $180
 Three layers keep costs bounded (`src/lib/billing`):
 
 1. **Allowances, reserved before work starts.** Words read, grammar-check words, character chat messages and pitch kits are taken from the monthly allowance (then book-pass credit) inside a row-locked transaction *before* the AI is called, and given back if the work fails. A full read reserves chapter by chapter, so it pauses cleanly at the limit and resumes after an upgrade. Paid allowances reset monthly (yearly plans too); Free never resets. One read at a time per user.
-2. **Spend ceiling per user.** Every AI call is logged in `AiUsage` with its real cost from token counts (`cost.ts`). Once a user's spend for the period reaches their plan's `costCapUsd`, new AI work is refused, whatever the allowances say.
+2. **Spend ceiling per user.** Before every AI call, its worst-case cost is held against the user's ceiling in the same row-locked step, then settled to the real cost from token counts (`cost.ts`) and logged in `AiUsage`. Calls fired in parallel each hold their share, so together they can't pass the plan's `costCapUsd`.
 3. **Daily budget for the whole app.** `AI_DAILY_BUDGET_USD` pauses new AI work for everyone once the day's spend reaches it. Also set a monthly spend limit on your API key's workspace in the Claude Console.
 
 ### Setting up Stripe
@@ -97,10 +97,10 @@ Three layers keep costs bounded (`src/lib/billing`):
    - Pro: recurring $39/month and $372/year
    - Book pass: one-time $29
 2. Copy each price id (`price_...`) and your secret key into `.env` (see `.env.example`).
-3. Add a webhook endpoint at `https://<your app>/api/stripe/webhook` for `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated` and `customer.subscription.deleted`, and put its signing secret in `STRIPE_WEBHOOK_SECRET`. Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+3. Add a webhook endpoint at `https://<your app>/api/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` and `charge.refunded`, and put its signing secret in `STRIPE_WEBHOOK_SECRET`. Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 4. In Stripe's customer portal settings, allow switching between the four subscription prices and cancelling.
 
-Plans are matched to subscriptions by price id, so changing a price in Stripe only needs the env var updated.
+Plans are matched to subscriptions by price id, so changing a price in Stripe only needs the env var updated. The webhook always re-reads the subscription from Stripe (events can arrive out of order), checkout refuses to start a second subscription, and book passes are credited once per checkout session (including 100% promotion codes and delayed payment methods) and removed on a full refund.
 
 ## Roadmap to SaaS
 

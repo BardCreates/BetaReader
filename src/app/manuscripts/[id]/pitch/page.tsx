@@ -7,6 +7,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { Prose } from "@/components/Prose";
 import { SubmitButton } from "@/components/SubmitButton";
 import { buttonClass, Card, ghostButtonClass } from "@/components/ui";
+import { limitMessageFor } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
 import { STALE_READ_MS } from "@/lib/reader/pipeline";
 import type { PitchKitContent } from "@/lib/reader/schemas";
@@ -22,7 +23,8 @@ export default async function PitchKitPage({
 }) {
   const user = await requireUser();
   const { id } = await params;
-  const limit = (await searchParams).limit;
+  // The reason is worked out here, never taken from the URL.
+  const limit = (await searchParams).limit ? await limitMessageFor(user.id, "pitchKits") : null;
   const ms = await db.manuscript.findFirst({
     where: { id, userId: user.id },
     select: {
