@@ -205,7 +205,7 @@ export function ChapterWorkspace(p: Props) {
   const readLabel = p.review?.status === "DONE" ? "Re-read this chapter" : "Read this chapter";
 
   return (
-    <main className="max-w-[96rem] px-4 py-6 sm:px-8 lg:px-12">
+    <main className="mx-auto max-w-[96rem] px-4 py-6 sm:px-8 lg:px-12">
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -265,7 +265,7 @@ export function ChapterWorkspace(p: Props) {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         {/* Editor */}
         <Card className="px-4 py-4 sm:px-10 sm:py-6">
-          <div className="mx-auto max-w-[40rem]">
+          <div className="mx-auto max-w-[46rem]">
             <ChapterEditor
               ref={editorRef}
               initialDoc={p.initialDoc}
