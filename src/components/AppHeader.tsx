@@ -5,7 +5,7 @@ export function AppHeader({ email, crumbs = [] }: { email?: string | null; crumb
   return (
     <header className="border-b border-line bg-card/70 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 text-sm">
-        <Link href="/dashboard" className="font-serif text-lg font-semibold tracking-tight">
+        <Link href="/dashboard" className="shrink-0 whitespace-nowrap font-serif text-lg font-semibold tracking-tight">
           Beta Reader
         </Link>
         {crumbs.map((c) => (
@@ -19,7 +19,7 @@ export function AppHeader({ email, crumbs = [] }: { email?: string | null; crumb
         <div className="ml-auto flex items-center gap-3 text-muted">
           {email && <span className="hidden sm:inline">{email}</span>}
           <form action={signOutAction}>
-            <button className="rounded px-2 py-1 hover:bg-line/60 hover:text-ink">Sign out</button>
+            <button className="whitespace-nowrap rounded px-2 py-1 hover:bg-line/60 hover:text-ink">Sign out</button>
           </form>
         </div>
       </div>

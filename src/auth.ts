@@ -32,10 +32,13 @@ if (devLoginEnabled) {
   );
 }
 
-export const authProviders = providers.map((p) => {
-  const config = typeof p === "function" ? p() : p;
-  return { id: config.id, name: config.name };
-});
+// What the sign-in page shows. Listed explicitly: provider factories don't expose their
+// final id/name until Auth.js merges options at runtime.
+export const authProviders: { id: string; name: string }[] = [
+  ...(process.env.AUTH_GITHUB_ID ? [{ id: "github", name: "GitHub" }] : []),
+  ...(process.env.AUTH_GOOGLE_ID ? [{ id: "google", name: "Google" }] : []),
+  ...(devLoginEnabled ? [{ id: "dev", name: "Dev login" }] : []),
+];
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),

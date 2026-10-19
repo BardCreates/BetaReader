@@ -75,7 +75,13 @@ export default async function EditorPage({
           conversationId={current?.id ?? null}
           chapterId={chapterId}
           chapters={ms.chapters.map((c) => ({ id: c.id, label: `${c.index + 1}. ${c.title}` }))}
-          contextLabel={chapter ? `Chapter ${chapter.index + 1}: ${chapter.title}` : "The whole manuscript"}
+          contextLabel={
+            chapter
+              ? /^(chapter|ch\.)\s/i.test(chapter.title)
+                ? chapter.title
+                : `Chapter ${chapter.index + 1}: ${chapter.title}`
+              : "The whole manuscript"
+          }
           initialMessages={messages.map((m) => ({ id: m.id, role: m.role as "user" | "assistant", content: m.content }))}
           initialDraft={current ? "" : sp.q ?? ""}
         />

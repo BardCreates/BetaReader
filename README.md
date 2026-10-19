@@ -22,17 +22,17 @@ upload (.docx/.txt/.md or paste)
 
 ## Stack
 
-Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Prisma + Postgres · Auth.js (GitHub, Google, dev email login) · Anthropic API (`@anthropic-ai/sdk`).
+Next.js 16 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Prisma 7 + Postgres (via `@prisma/adapter-pg`) · Auth.js v5 (GitHub, Google, dev email login) · Anthropic API (`@anthropic-ai/sdk`).
 
 ## Getting started
 
-Requirements: Node 20+, a Postgres database (local, or a free one from Neon/Supabase), and an Anthropic API key.
+Requirements: Node 22+, a Postgres database (local, or a free one from Neon/Supabase), and an Anthropic API key.
 
 ```bash
 npm install
 cp .env.example .env          # then fill in DATABASE_URL, AUTH_SECRET and ANTHROPIC_API_KEY
 npx auth secret               # writes AUTH_SECRET for you
-npm run db:migrate -- --name init
+npm run db:migrate             # creates the tables from prisma/migrations
 npm run dev
 ```
 
@@ -53,7 +53,9 @@ Open http://localhost:3000, sign in with the dev email login (enabled by `AUTH_D
 ## Project layout
 
 ```
-prisma/schema.prisma            data model: users, manuscripts, chapters, reviews, notes, report, conversations
+prisma/schema.prisma            data model (client is generated into src/generated/prisma)
+prisma.config.ts                Prisma CLI config (reads DATABASE_URL from .env)
+, manuscripts, chapters, reviews, notes, report, conversations
 src/auth.ts                     Auth.js config + requireUser()
 src/app/actions.ts              server actions: upload, start reading, revise chapter, note status, delete
 src/app/api/manuscripts/[id]/chat/route.ts   streaming editor chat

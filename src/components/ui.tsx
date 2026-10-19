@@ -1,4 +1,4 @@
-import type { ReadingStatus } from "@prisma/client";
+import type { ReadingStatus } from "@/generated/prisma/client";
 
 export function StatusBadge({ status }: { status: ReadingStatus }) {
   const map: Record<ReadingStatus, [string, string]> = {
@@ -34,7 +34,7 @@ export function EngagementStrip({ values }: { values: { label: string; value: nu
           key={i}
           href={v.href}
           title={`${v.label}: ${v.value ?? "not read"}${v.value ? "/10" : ""}`}
-          className="group flex flex-1 flex-col items-center justify-end"
+          className="group flex h-full flex-1 flex-col items-center justify-end"
         >
           <div
             className={`w-full max-w-6 rounded-t transition group-hover:opacity-80 ${

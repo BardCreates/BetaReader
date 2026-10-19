@@ -1,5 +1,5 @@
 import "server-only";
-import type { NoteKind, Prisma } from "@prisma/client";
+import type { NoteKind, Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { MODEL, callTool } from "./anthropic";

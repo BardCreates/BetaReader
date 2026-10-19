@@ -8,7 +8,7 @@ import { buildEditorSystem } from "@/lib/reader/editor";
 export const maxDuration = 120;
 
 const Body = z.object({
-  conversationId: z.string().optional(),
+  conversationId: z.string().nullish(),
   chapterId: z.string().nullable().optional(),
   message: z.string().trim().min(1).max(20_000),
 });
