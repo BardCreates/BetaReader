@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth.js tables ───────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // SaaS groundwork: plan + usage metering (Stripe hooks up to these later)
+  plan             String  @default("free")
+  stripeCustomerId String? @unique
+  wordsReadTotal   Int     @default(0)
+
+  accounts    Account[]
+  sessions    Session[]
+  manuscripts Manuscript[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ─── Manuscripts ─────────────────────────────────────────────────
+
+enum ReadingStatus {
+  DRAFT    // uploaded, not read yet
+  QUEUED
+  READING
+  DONE
+  ERROR
+}
+
+model Manuscript {
+  id          String        @id @default(cuid())
+  userId      String
+  title       String
+  genre       String?
+  audience    String?       // e.g. "adult", "YA", "middle grade"
+  authorGoals String?       @db.Text // what the author wants feedback on
+  persona     String        @default("enthusiast") // see src/lib/reader/personas.ts
+  wordCount   Int           @default(0)
+  status      ReadingStatus @default(DRAFT)
+  error       String?       @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapters      Chapter[]
+  report        BookReport?
+  conversations Conversation[]
+
+  @@index([userId])
+}
+
+model Chapter {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  index        Int      // 0-based reading order
+  title        String
+  content      String   @db.Text
+  wordCount    Int
+  createdAt    DateTime @default(now())
+
+  manuscript    Manuscript     @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  review        ChapterReview?
+  conversations Conversation[]
+
+  @@unique([manuscriptId, index])
+}
+
+// What the AI reader experienced in one chapter.
+model ChapterReview {
+  id         String        @id @default(cuid())
+  chapterId  String        @unique
+  status     ReadingStatus @default(QUEUED)
+  error      String?       @db.Text
+
+  reaction   String?       @db.Text // first-person, as-I-read reaction
+  summary    String?       @db.Text // what happened, as the reader understood it
+  engagement Int?          // 1–10: how much the reader wanted to keep going
+  strengths  Json?         // string[]
+  questions  Json?         // string[] — open questions the reader is carrying
+  predictions Json?        // string[] — what the reader thinks will happen
+  memory     String?       @db.Text // running "reader memory" handed to the next chapter
+
+  model        String?
+  inputTokens  Int @default(0)
+  outputTokens Int @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  notes   Note[]
+}
+
+enum NoteKind {
+  REACTION // "I gasped here"
+  PRAISE   // this is working, keep it
+  ISSUE    // this isn't working
+}
+
+enum NoteStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+// An inline note anchored to a passage of the chapter.
+model Note {
+  id          String     @id @default(cuid())
+  reviewId    String
+  kind        NoteKind
+  category    String     // pacing, clarity, character, dialogue, prose, plot, worldbuilding, continuity, tension, voice
+  severity    Int        @default(2) // 1 = minor, 2 = notable, 3 = major
+  quote       String     @db.Text   // exact passage from the chapter
+  startOffset Int?       // character offsets into Chapter.content (null if the quote couldn't be located)
+  endOffset   Int?
+  comment     String     @db.Text   // what the reader felt / why it isn't working
+  suggestion  String?    @db.Text   // how to fix it
+  status      NoteStatus @default(OPEN)
+  createdAt   DateTime   @default(now())
+
+  review ChapterReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+}
+
+// Whole-book developmental read, written after the last chapter.
+model BookReport {
+  id           String        @id @default(cuid())
+  manuscriptId String        @unique
+  status       ReadingStatus @default(QUEUED)
+  error        String?       @db.Text
+  content      Json?         // see BookReportSchema in src/lib/reader/schemas.ts
+  model        String?
+  inputTokens  Int @default(0)
+  outputTokens Int @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+}
+
+// ─── Editor conversations ────────────────────────────────────────
+
+model Conversation {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  chapterId    String?
+  title        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  chapter    Chapter?   @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  messages   Message[]
+
+  @@index([manuscriptId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String   // "user" | "assistant"
+  content        String   @db.Text
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}

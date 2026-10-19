@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-literata), ui-serif, Georgia, serif;
+
+  --color-paper: #f7f3ec;
+  --color-card: #fffdf9;
+  --color-ink: #24201b;
+  --color-muted: #6f675d;
+  --color-line: #e4dccf;
+  --color-accent: #8a3b2a;      /* oxblood */
+  --color-accent-soft: #f3e2dc;
+  --color-praise: #2f6b4f;
+  --color-praise-soft: #dcefe4;
+  --color-issue: #9a5b12;
+  --color-issue-soft: #f8e7c9;
+  --color-reaction: #3b5b8a;
+  --color-reaction-soft: #dfe7f3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #191714;
+    --color-card: #221f1b;
+    --color-ink: #ede6da;
+    --color-muted: #a39a8d;
+    --color-line: #38332c;
+    --color-accent: #e08a74;
+    --color-accent-soft: #3a2621;
+    --color-praise: #7cc3a0;
+    --color-praise-soft: #1f3329;
+    --color-issue: #e3ad62;
+    --color-issue-soft: #3a2d18;
+    --color-reaction: #92b2e3;
+    --color-reaction-soft: #1f2a3a;
+  }
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.manuscript {
+  font-family: var(--font-serif);
+  font-size: 1.075rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+mark.note {
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+  color: inherit;
+  transition: outline-color 0.15s;
+  outline: 2px solid transparent;
+}
+mark.note[data-kind="ISSUE"] { background: var(--color-issue-soft); border-bottom: 2px solid var(--color-issue); }
+mark.note[data-kind="PRAISE"] { background: var(--color-praise-soft); border-bottom: 2px solid var(--color-praise); }
+mark.note[data-kind="REACTION"] { background: var(--color-reaction-soft); border-bottom: 2px solid var(--color-reaction); }
+mark.note[data-dim="true"] { background: transparent; border-bottom-style: dotted; }
+mark.note[data-active="true"] { outline-color: var(--color-accent); }
