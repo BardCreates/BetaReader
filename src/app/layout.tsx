@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: browser extensions often add attributes to <html> before React loads.
+    <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen font-sans antialiased">{children}</body>
     </html>
   );
