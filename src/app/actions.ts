@@ -13,6 +13,7 @@ import { docToPlain, plainToDoc, sanitizeDoc } from "@/lib/manuscript/doc";
 import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
 import { planFor } from "@/lib/plans";
 import { PERSONAS } from "@/lib/reader/personas";
+import { lineEditText, type LineSuggestion } from "@/lib/reader/lineEdit";
 import { MIN_WORDS_TO_READ, claimManuscript, readManuscript, rereadChapter } from "@/lib/reader/pipeline";
 
 export type FormState = { error?: string } | undefined;
@@ -85,6 +86,7 @@ export async function startReading(manuscriptId: string, fresh = false) {
       await db.$transaction([
         db.chapterReview.deleteMany({ where: { chapter: { manuscriptId } } }),
         db.bookReport.deleteMany({ where: { manuscriptId } }),
+        db.readerThread.deleteMany({ where: { manuscriptId } }),
       ]);
     }
     // Respond immediately; the read continues after the response is sent.
@@ -157,6 +159,40 @@ export async function renameChapter(chapterId: string, title: string): Promise<F
   if (!clean) return { error: "Give the chapter a title." };
   await db.chapter.update({ where: { id: chapter.id }, data: { title: clean } });
   revalidatePath(`/manuscripts/${chapter.manuscript.id}`, "layout");
+  return undefined;
+}
+
+export type GrammarResult = { ok: true; suggestions: LineSuggestion[] } | { ok: false; error: string };
+
+/** Grammar & style check on the chapter as it is in the editor right now (unsaved changes included). */
+export async function checkGrammar(chapterId: string, rawDoc: unknown): Promise<GrammarResult> {
+  const user = await requireUser();
+  const chapter = await ownedChapter(chapterId, user.id);
+  if (!chapter) return { ok: false, error: "Chapter not found." };
+  let text: string;
+  try {
+    text = docToPlain(sanitizeDoc(rawDoc));
+  } catch {
+    return { ok: false, error: "Couldn't read the chapter text." };
+  }
+  if (countWords(text) < 3) return { ok: true, suggestions: [] };
+  if (text.length > MAX_CHAPTER_CHARS) return { ok: false, error: "This chapter is too long to check at once. Try splitting it." };
+  try {
+    const { suggestions } = await lineEditText(text);
+    return { ok: true, suggestions };
+  } catch (err) {
+    console.error("grammar check failed", err);
+    return { ok: false, error: "The grammar check didn't finish. Please try again." };
+  }
+}
+
+/** What the author wants this chapter to do; checked against the reader's experience on the next read. */
+export async function setChapterIntent(chapterId: string, intent: string): Promise<FormState> {
+  const user = await requireUser();
+  const chapter = await ownedChapter(chapterId, user.id);
+  if (!chapter) return { error: "Chapter not found." };
+  const clean = typeof intent === "string" ? intent.trim().slice(0, 2000) : "";
+  await db.chapter.update({ where: { id: chapter.id }, data: { intent: clean || null } });
   return undefined;
 }
 

@@ -7,4 +7,6 @@
  */
 export const FEATURES = {
   editorChat: false,
+  /** Chat in-voice with characters from the manuscript, for brainstorming. */
+  characterChat: true,
 } as const;

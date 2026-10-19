@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { addChapter, signOutAction } from "@/app/actions";
+import { FEATURES } from "@/lib/features";
 import type { ChapterState, SidebarData } from "@/lib/sidebar";
 
 export function Sidebar({ email, data }: { email: string | null; data: SidebarData }) {
@@ -39,6 +40,14 @@ export function Sidebar({ email, data }: { email: string | null; data: SidebarDa
               Overview &amp; report
               {ms.reading && <Dot state="reading" />}
             </NavLink>
+            <NavLink href={`${base}/journey`} active={pathname === `${base}/journey`}>
+              Reader journey
+            </NavLink>
+            {FEATURES.characterChat && (
+              <NavLink href={`${base}/characters`} active={pathname.startsWith(`${base}/characters`)}>
+                Characters
+              </NavLink>
+            )}
             <Divider />
             <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wider text-muted">Chapters</p>
             <ol>

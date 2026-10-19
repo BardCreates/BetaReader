@@ -22,6 +22,12 @@ export type HighlightNote = {
 export type ChapterEditorHandle = {
   /** Scroll a note's highlighted passage into view. */
   revealNote: (id: string) => void;
+  /** The document as it is in the editor right now. */
+  getDoc: () => DocNode | null;
+  setSuggestions: (list: Suggestion[]) => void;
+  acceptSuggestion: (id: string, replacement: string) => void;
+  dismissSuggestion: (id: string) => void;
+  revealSuggestion: (id: string) => void;
 };
 
 // ─── Highlights that follow the author's edits ───────────────────
@@ -85,6 +91,80 @@ function NoteHighlights(onAnchors: (found: Set<string>) => void) {
   });
 }
 
+// ─── Grammar & style suggestions ─────────────────────────────────
+
+export type Suggestion = { id: string; quote: string; replacement: string; type: string; explanation: string };
+
+type SuggestionMeta = { set: Suggestion[] } | { remove: string };
+const suggestionKey = new PluginKey<DecorationSet>("lineSuggestions");
+
+function buildSuggestions(doc: PMNode, list: Suggestion[]) {
+  const { text, posAt } = serializeDoc(doc.toJSON() as DocNode);
+  const decos: Decoration[] = [];
+  let hint = 0;
+  for (const sug of list) {
+    const a = findQuote(text, sug.quote, hint);
+    const r = a && plainRangeToPos(posAt, a.start, a.end);
+    if (!r) continue;
+    hint = a.start;
+    decos.push(
+      Decoration.inline(
+        r.from,
+        r.to,
+        { nodeName: "span", class: "suggestion", "data-suggestion": sug.id, "data-type": sug.type },
+        // Remember the exact text so the suggestion is dropped if the author edits it.
+        { id: sug.id, text: doc.textBetween(r.from, r.to, "\n", "\n") },
+      ),
+    );
+  }
+  return DecorationSet.create(doc, decos);
+}
+
+function LineSuggestions(onChange: (ids: string[]) => void) {
+  const report = (set: DecorationSet) => {
+    const ids = set.find().map((d) => (d.spec as { id: string }).id);
+    queueMicrotask(() => onChange(ids));
+  };
+  return Extension.create({
+    name: "lineSuggestions",
+    addProseMirrorPlugins() {
+      return [
+        new Plugin<DecorationSet>({
+          key: suggestionKey,
+          state: {
+            init: (_, state) => DecorationSet.create(state.doc, []),
+            apply(tr, old) {
+              const meta = tr.getMeta(suggestionKey) as SuggestionMeta | undefined;
+              if (meta && "set" in meta) {
+                const set = buildSuggestions(tr.doc, meta.set);
+                report(set);
+                return set;
+              }
+              let set = tr.docChanged ? old.map(tr.mapping, tr.doc) : old;
+              let removed = false;
+              if (meta && "remove" in meta) {
+                set = set.remove(set.find(undefined, undefined, (spec) => spec.id === meta.remove));
+                removed = true;
+              }
+              if (tr.docChanged) {
+                // Drop suggestions whose text the author has since changed.
+                const stale = set.find().filter((d) => tr.doc.textBetween(d.from, d.to, "\n", "\n") !== (d.spec as { text: string }).text);
+                if (stale.length) {
+                  set = set.remove(stale);
+                  removed = true;
+                }
+              }
+              if (removed) report(set);
+              return set;
+            },
+          },
+          props: { decorations: (state) => suggestionKey.getState(state) },
+        }),
+      ];
+    },
+  });
+}
+
 // ─── Editor ──────────────────────────────────────────────────────
 
 type Props = {
@@ -96,6 +176,11 @@ type Props = {
   onChange: (doc: DocNode) => void;
   onNoteClick: (id: string) => void;
   onAnchors: (found: Set<string>) => void;
+  /** Ids of grammar suggestions still applicable (anchored and unchanged). */
+  onSuggestions: (ids: string[]) => void;
+  onSuggestionClick: (id: string) => void;
+  /** Extra controls at the end of the toolbar. */
+  toolbarExtra?: React.ReactNode;
 };
 
 export const ChapterEditor = forwardRef<ChapterEditorHandle, Props>(function ChapterEditor(props, ref) {
@@ -122,6 +207,7 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, Props>(function Cha
       }),
       Placeholder.configure({ placeholder: "Start writing…" }),
       NoteHighlights((found) => cb.current.onAnchors(found)),
+      LineSuggestions((ids) => cb.current.onSuggestions(ids)),
     ],
     content: props.initialDoc,
     editorProps: {
@@ -143,6 +229,28 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, Props>(function Cha
     () => ({
       revealNote(id) {
         const el = editor?.view.dom.querySelector(`mark[data-note="${CSS.escape(id)}"]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      },
+      getDoc: () => (editor ? (editor.getJSON() as DocNode) : null),
+      setSuggestions(list) {
+        if (!editor) return;
+        editor.view.dispatch(editor.state.tr.setMeta(suggestionKey, { set: list }).setMeta("addToHistory", false));
+      },
+      acceptSuggestion(id, replacement) {
+        if (!editor) return;
+        const set = suggestionKey.getState(editor.state);
+        const deco = set?.find(undefined, undefined, (spec) => spec.id === id)[0];
+        if (!deco) return;
+        // One undoable step: replace the text (this also drops the suggestion, since its text changed).
+        const tr = editor.state.tr.insertText(replacement, deco.from, deco.to).setMeta(suggestionKey, { remove: id });
+        editor.view.dispatch(tr);
+      },
+      dismissSuggestion(id) {
+        if (!editor) return;
+        editor.view.dispatch(editor.state.tr.setMeta(suggestionKey, { remove: id }).setMeta("addToHistory", false));
+      },
+      revealSuggestion(id) {
+        const el = editor?.view.dom.querySelector(`[data-suggestion="${CSS.escape(id)}"]`);
         el?.scrollIntoView({ behavior: "smooth", block: "center" });
       },
     }),
@@ -178,14 +286,17 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, Props>(function Cha
         <ToolButton label="Redo (Ctrl+Shift+Z)" disabled={!marks?.canRedo} onClick={() => editor?.chain().focus().redo().run()}>
           ↷
         </ToolButton>
+        {props.toolbarExtra && <div className="ml-auto flex items-center gap-1">{props.toolbarExtra}</div>}
       </div>
       {props.activeNoteId && (
         <style>{`mark.note[data-note="${CSS.escape(props.activeNoteId)}"] { outline-color: var(--color-accent); }`}</style>
       )}
       <div
         onClick={(e) => {
-          const mark = (e.target as HTMLElement).closest("mark[data-note]");
-          const id = mark?.getAttribute("data-note");
+          const target = e.target as HTMLElement;
+          const sug = target.closest("[data-suggestion]")?.getAttribute("data-suggestion");
+          if (sug) cb.current.onSuggestionClick(sug);
+          const id = target.closest("mark[data-note]")?.getAttribute("data-note");
           if (id) cb.current.onNoteClick(id);
         }}
       >

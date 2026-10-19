@@ -1,5 +1,5 @@
 import "server-only";
-import type { NoteKind, Prisma } from "@/generated/prisma/client";
+import { Prisma, type NoteKind } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { MODEL, callStructured } from "./anthropic";
@@ -17,7 +17,7 @@ const KIND: Record<"reaction" | "praise" | "issue", NoteKind> = {
  * so double-clicks and concurrent requests don't start two readers.
  */
 /** Chapters shorter than this are skipped (e.g. a new chapter the author hasn't written yet). */
-export const MIN_WORDS_TO_READ = 50;
+export const MIN_WORDS_TO_READ = 20;
 
 /** Notes are out of date when the chapter's text changed after its read started. */
 export function isReviewStale(review: { status: string; readAt: Date | null; updatedAt: Date } | null, contentUpdatedAt: Date) {
@@ -141,14 +141,46 @@ export async function rereadChapter(chapterId: string) {
   }
 }
 
+type ChapterToRead = {
+  id: string;
+  manuscriptId: string;
+  index: number;
+  title: string;
+  content: string;
+  wordCount: number;
+  intent: string | null;
+};
+
+const AUTHOR_STATUS = { OPEN: "open", RESOLVED: "marked fixed", DISMISSED: "author disagreed" } as const;
+const OUTCOME = { answered: "ANSWERED", confirmed: "CONFIRMED", refuted: "REFUTED" } as const;
+/** Cap on carried questions/predictions shown to the reader, newest kept. */
+const MAX_OPEN_THREADS = 40;
+
 async function readChapter(args: {
   system: { type: "text"; text: string; cache_control: { type: "ephemeral" } }[];
-  chapter: { id: string; index: number; title: string; content: string; wordCount: number };
+  chapter: ChapterToRead;
   total: number;
   memory: string | null;
 }): Promise<string> {
   const { chapter } = args;
   const readAt = new Date();
+
+  // What the reader thought last time, for the revision check (a re-read after edits).
+  const before = await db.chapterReview.findUnique({
+    where: { chapterId: chapter.id },
+    include: { notes: { where: { kind: "ISSUE" }, orderBy: { startOffset: "asc" } } },
+  });
+  const previousIssues =
+    before?.status === "DONE" || (before?.notes.length ?? 0) > 0
+      ? (before?.notes ?? []).map((n, i) => ({
+          id: `N${i + 1}`,
+          quote: n.quote,
+          comment: n.comment,
+          authorStatus: AUTHOR_STATUS[n.status],
+        }))
+      : [];
+  const previousEngagement = before?.engagement ?? null;
+
   const review = await db.chapterReview.upsert({
     where: { chapterId: chapter.id },
     update: { status: "READING", error: null },
@@ -156,9 +188,46 @@ async function readChapter(args: {
   });
 
   try {
+    // Reader journey: forget what this chapter raised or settled last time, then gather
+    // everything the reader is carrying into it (raised earlier, not settled before it).
+    await db.$transaction([
+      db.readerThread.deleteMany({ where: { raisedChapterId: chapter.id } }),
+      db.readerThread.updateMany({
+        where: { resolvedChapterId: chapter.id },
+        data: { resolvedChapterId: null, outcome: "OPEN", resolution: null },
+      }),
+    ]);
+    const carried = (
+      await db.readerThread.findMany({
+        where: { manuscriptId: chapter.manuscriptId, raisedChapter: { index: { lt: chapter.index } } },
+        include: { raisedChapter: { select: { index: true } }, resolvedChapter: { select: { index: true } } },
+        orderBy: { createdAt: "asc" },
+      })
+    )
+      .filter((t) => t.outcome === "OPEN" || (t.resolvedChapter && t.resolvedChapter.index > chapter.index))
+      .slice(-MAX_OPEN_THREADS);
+    let q = 0;
+    let pr = 0;
+    const openThreads = carried.map((t) => ({
+      id: t.kind === "QUESTION" ? `Q${++q}` : `P${++pr}`,
+      threadId: t.id,
+      kind: t.kind === "QUESTION" ? ("question" as const) : ("prediction" as const),
+      text: t.text,
+      raisedIn: t.raisedChapter.index + 1,
+    }));
+
     const { data, usage } = await callStructured({
       system: args.system,
-      user: chapterUserPrompt({ index: chapter.index, total: args.total, title: chapter.title, content: chapter.content, memory: args.memory }),
+      user: chapterUserPrompt({
+        index: chapter.index,
+        total: args.total,
+        title: chapter.title,
+        content: chapter.content,
+        memory: args.memory,
+        openThreads,
+        intent: chapter.intent,
+        previous: previousIssues.length ? { engagement: previousEngagement, issues: previousIssues } : null,
+      }),
       schema: chapterFeedbackTool.input_schema,
       // Headroom for the model's reasoning plus notes, reaction and memory.
       maxTokens: Math.min(32_000, 16_000 + Math.round(chapter.wordCount / 2)),
@@ -187,9 +256,43 @@ async function readChapter(args: {
       };
     });
 
+    const byLabel = new Map(openThreads.map((t) => [t.id.toUpperCase(), t.threadId]));
+    const resolutions = data.resolvedThreads.flatMap((r) => {
+      const threadId = byLabel.get(r.id.trim().toUpperCase());
+      return threadId ? [{ threadId, outcome: OUTCOME[r.outcome], resolution: r.resolution }] : [];
+    });
+    const newThreads: Prisma.ReaderThreadCreateManyInput[] = [
+      ...data.questions.map((t) => ({ manuscriptId: chapter.manuscriptId, kind: "QUESTION" as const, text: t, raisedChapterId: chapter.id })),
+      ...data.predictions.map((t) => ({ manuscriptId: chapter.manuscriptId, kind: "PREDICTION" as const, text: t, raisedChapterId: chapter.id })),
+    ];
+
+    const prevById = new Map(previousIssues.map((i) => [i.id, i]));
+    const revisionCheck =
+      previousIssues.length && data.revisionCheck?.length
+        ? {
+            previousEngagement,
+            notes: data.revisionCheck.flatMap((r) => {
+              const prev = prevById.get(r.id.trim().toUpperCase());
+              return prev
+                ? [{ quote: prev.quote, comment: prev.comment, authorStatus: prev.authorStatus, verdict: r.verdict, explanation: r.explanation }]
+                : [];
+            }),
+          }
+        : previousIssues.length
+          ? { previousEngagement, notes: [] }
+          : null;
+    const intentCheck = chapter.intent?.trim() && data.intentCheck ? { intent: chapter.intent.trim(), ...data.intentCheck } : null;
+
     await db.$transaction([
       db.note.deleteMany({ where: { reviewId: review.id } }),
       db.note.createMany({ data: notes }),
+      db.readerThread.createMany({ data: newThreads }),
+      ...resolutions.map((r) =>
+        db.readerThread.update({
+          where: { id: r.threadId },
+          data: { outcome: r.outcome, resolution: r.resolution, resolvedChapterId: chapter.id },
+        }),
+      ),
       db.chapterReview.update({
         where: { id: review.id },
         data: {
@@ -202,6 +305,8 @@ async function readChapter(args: {
           questions: data.questions,
           predictions: data.predictions,
           memory: data.memory,
+          intentCheck: intentCheck ?? Prisma.DbNull,
+          revisionCheck: revisionCheck ?? Prisma.DbNull,
           model: MODEL,
           inputTokens: usage.input,
           outputTokens: usage.output,
@@ -223,6 +328,8 @@ async function writeBookReport(manuscriptId: string, ctx: ManuscriptContext) {
     include: { review: { include: { notes: { where: { kind: "ISSUE" }, orderBy: { severity: "desc" } } } } },
   });
 
+  const threads = await db.readerThread.findMany({ where: { manuscriptId }, select: { kind: true, outcome: true, text: true } });
+
   await db.bookReport.upsert({
     where: { manuscriptId },
     update: { status: "READING", error: null },
@@ -243,7 +350,12 @@ async function writeBookReport(manuscriptId: string, ctx: ManuscriptContext) {
           issues: (c.review?.notes ?? []).map((n) => `[${n.category}, severity ${n.severity}] ${n.comment}`),
           questions: (c.review?.questions as string[] | null) ?? [],
         })),
-        finalMemory: chapters.at(-1)?.review?.memory ?? null,
+        finalMemory: chapters.findLast((c) => c.review?.memory)?.review?.memory ?? null,
+        ledger: {
+          unanswered: threads.filter((t) => t.kind === "QUESTION" && t.outcome === "OPEN").map((t) => t.text),
+          guessed: threads.filter((t) => t.outcome === "CONFIRMED").map((t) => t.text),
+          surprises: threads.filter((t) => t.outcome === "REFUTED").map((t) => t.text),
+        },
       }),
       schema: bookReportTool.input_schema,
       maxTokens: 32_000,

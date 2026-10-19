@@ -4,7 +4,7 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { db } from "@/lib/db";
 import { plainToDoc, type DocNode } from "@/lib/manuscript/doc";
 import { MIN_WORDS_TO_READ, isReviewStale, isStale } from "@/lib/reader/pipeline";
-import { ChapterWorkspace } from "./ChapterWorkspace";
+import { ChapterWorkspace, type IntentCheck, type RevisionCheck } from "./ChapterWorkspace";
 
 export default async function ChapterPage({ params }: { params: Promise<{ id: string; n: string }> }) {
   const user = await requireUser();
@@ -38,6 +38,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ id: st
         index={index}
         total={ms._count.chapters}
         title={chapter.title}
+        intent={chapter.intent ?? ""}
         initialDoc={(chapter.doc as DocNode | null) ?? plainToDoc(chapter.content)}
         wordCount={chapter.wordCount}
         stale={isReviewStale(r, chapter.contentUpdatedAt)}
@@ -55,6 +56,8 @@ export default async function ChapterPage({ params }: { params: Promise<{ id: st
                 strengths: (r.strengths as string[] | null) ?? [],
                 questions: (r.questions as string[] | null) ?? [],
                 predictions: (r.predictions as string[] | null) ?? [],
+                intentCheck: (r.intentCheck as IntentCheck | null) ?? null,
+                revisionCheck: (r.revisionCheck as RevisionCheck | null) ?? null,
                 notes: r.notes.map((note) => ({
                   id: note.id,
                   kind: note.kind,

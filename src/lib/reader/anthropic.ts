@@ -16,6 +16,8 @@ export function anthropic() {
  * Retries once on malformed output and once with more room if the answer was cut off.
  */
 export async function callStructured<T>(opts: {
+  /** Defaults to the reader model. */
+  model?: string;
   system: Anthropic.TextBlockParam[];
   user: string;
   schema: unknown;
@@ -31,7 +33,7 @@ export async function callStructured<T>(opts: {
     // Streamed so long reads don't hit the SDK's non-streaming time limit.
     const res = await anthropic()
       .messages.stream({
-        model: MODEL,
+        model: opts.model ?? MODEL,
         max_tokens: maxTokens,
         system: opts.system,
         output_config: { format: { type: "json_schema", schema } },

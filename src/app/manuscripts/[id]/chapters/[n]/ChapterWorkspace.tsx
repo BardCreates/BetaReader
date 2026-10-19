@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { deleteChapter, renameChapter, rereadChapterNow, saveChapter, setNoteStatus } from "@/app/actions";
+import { checkGrammar, deleteChapter, renameChapter, rereadChapterNow, saveChapter, setChapterIntent, setNoteStatus } from "@/app/actions";
 import { buttonClass, Card, ghostButtonClass } from "@/components/ui";
 import { FEATURES } from "@/lib/features";
 import type { DocNode } from "@/lib/manuscript/doc";
-import { ChapterEditor, type ChapterEditorHandle } from "./ChapterEditor";
+import { ChapterEditor, type ChapterEditorHandle, type Suggestion } from "./ChapterEditor";
 
 export type NoteView = {
   id: string;
@@ -21,6 +21,12 @@ export type NoteView = {
   status: "OPEN" | "RESOLVED" | "DISMISSED";
 };
 
+export type IntentCheck = { intent: string; landed: "yes" | "partly" | "no"; explanation: string };
+export type RevisionCheck = {
+  previousEngagement: number | null;
+  notes: { quote: string; comment: string; authorStatus: string; verdict: "fixed" | "partly" | "still_there"; explanation: string }[];
+};
+
 export type ReviewView = {
   status: "QUEUED" | "READING" | "DONE" | "ERROR";
   error: string | null;
@@ -31,6 +37,8 @@ export type ReviewView = {
   questions: string[];
   predictions: string[];
   notes: NoteView[];
+  intentCheck: IntentCheck | null;
+  revisionCheck: RevisionCheck | null;
 };
 
 type Props = {
@@ -39,6 +47,7 @@ type Props = {
   index: number;
   total: number;
   title: string;
+  intent: string;
   initialDoc: DocNode;
   wordCount: number;
   review: ReviewView | null;
@@ -148,6 +157,38 @@ export function ChapterWorkspace(p: Props) {
     document.getElementById(`note-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, []);
 
+  // ─── Grammar & style ───────────────────────────────────────────
+  const [tab, setTab] = useState<"notes" | "grammar">("notes");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [liveIds, setLiveIds] = useState<string[]>([]);
+  const [activeSug, setActiveSug] = useState<string | null>(null);
+  const [grammar, setGrammar] = useState<{ state: "idle" | "checking" | "done" | "error"; message?: string; found?: number }>({ state: "idle" });
+  const liveSuggestions = useMemo(() => {
+    const live = new Set(liveIds);
+    return suggestions.filter((sug) => live.has(sug.id));
+  }, [suggestions, liveIds]);
+
+  const runGrammar = async () => {
+    const doc = editorRef.current?.getDoc();
+    if (!doc) return;
+    setTab("grammar");
+    setGrammar({ state: "checking" });
+    const res = await checkGrammar(p.chapterId, doc);
+    if (!res.ok) {
+      setGrammar({ state: "error", message: res.error });
+      return;
+    }
+    setSuggestions(res.suggestions);
+    editorRef.current?.setSuggestions(res.suggestions);
+    setGrammar({ state: "done", found: res.suggestions.length });
+  };
+  const accept = (sug: Suggestion) => editorRef.current?.acceptSuggestion(sug.id, sug.replacement);
+  const dismiss = (sug: Suggestion) => editorRef.current?.dismissSuggestion(sug.id);
+  const acceptAll = (types: string[]) => {
+    // Back to front, so earlier replacements don't shift later ones.
+    [...liveSuggestions].reverse().filter((sug) => types.includes(sug.type)).forEach(accept);
+  };
+
   // ─── Re-read ───────────────────────────────────────────────────
   const [rereadError, setRereadError] = useState<string | null>(null);
   const [rereading, startReread] = useTransition();
@@ -171,6 +212,7 @@ export function ChapterWorkspace(p: Props) {
             Chapter {p.index + 1} of {p.total} · {words.toLocaleString()} words · <SaveStatus state={save} />
           </p>
           <TitleInput chapterId={p.chapterId} initial={p.title} />
+          <IntentInput chapterId={p.chapterId} initial={p.intent} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button className={buttonClass} onClick={reread} disabled={!canRead} title={words < p.minWords ? `Write at least ${p.minWords} words first` : undefined}>
@@ -212,6 +254,13 @@ export function ChapterWorkspace(p: Props) {
         </details>
       )}
 
+      {p.review?.status === "DONE" && (p.review.intentCheck || p.review.revisionCheck) && (
+        <div className="mb-5 grid gap-4 lg:grid-cols-2">
+          {p.review.intentCheck && <IntentCheckCard check={p.review.intentCheck} />}
+          {p.review.revisionCheck && <RevisionCheckCard check={p.review.revisionCheck} engagement={p.review.engagement} />}
+        </div>
+      )}
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         {/* Editor */}
         <Card className="px-4 py-4 sm:px-10 sm:py-6">
@@ -222,14 +271,70 @@ export function ChapterWorkspace(p: Props) {
               notes={highlightNotes}
               activeNoteId={active}
               onChange={onChange}
-              onNoteClick={focusCard}
+              onNoteClick={(id) => {
+                setTab("notes");
+                focusCard(id);
+              }}
               onAnchors={setAnchored}
+              onSuggestions={setLiveIds}
+              onSuggestionClick={(id) => {
+                setTab("grammar");
+                setActiveSug(id);
+                document.getElementById(`sug-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+              }}
+              toolbarExtra={
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={runGrammar}
+                  disabled={grammar.state === "checking"}
+                  className="h-8 rounded-md px-2 text-sm hover:bg-line/60 disabled:opacity-50"
+                  title="Check spelling, grammar and style"
+                >
+                  {grammar.state === "checking" ? "Checking…" : "✓ Grammar & style"}
+                </button>
+              }
             />
           </div>
         </Card>
 
-        {/* Notes */}
+        {/* Notes / grammar */}
         <aside className="space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto xl:pb-8">
+          <div className="flex rounded-lg border border-line bg-card p-1 text-sm" role="tablist">
+            {(
+              [
+                ["notes", `Reader notes${notes.length ? ` (${notes.length})` : ""}`],
+                ["grammar", `Grammar & style${grammar.state === "done" ? ` (${liveSuggestions.length})` : ""}`],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                role="tab"
+                aria-selected={tab === k}
+                onClick={() => setTab(k)}
+                className={`flex-1 rounded-md px-3 py-1.5 ${tab === k ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === "grammar" ? (
+            <GrammarPanel
+              state={grammar}
+              suggestions={liveSuggestions}
+              active={activeSug}
+              onRun={runGrammar}
+              onAccept={accept}
+              onDismiss={dismiss}
+              onAcceptAll={acceptAll}
+              onFocus={(sug) => {
+                setActiveSug(sug.id);
+                editorRef.current?.revealSuggestion(sug.id);
+              }}
+            />
+          ) : (
+          <>
           {notes.length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               {(["ALL", "ISSUE", "PRAISE", "REACTION"] as const).map((k) => (
@@ -278,6 +383,8 @@ export function ChapterWorkspace(p: Props) {
               {p.review.questions.length > 0 && <ListCard title="Questions I’m carrying" items={p.review.questions} tone="text-reaction" />}
               {p.review.predictions.length > 0 && <ListCard title="My predictions" items={p.review.predictions} tone="text-muted" />}
             </>
+          )}
+          </>
           )}
 
           <div className="flex justify-between pt-2 text-sm">
@@ -368,6 +475,207 @@ function TitleInput({ chapterId, initial }: { chapterId: string; initial: string
       />
       {error && <p className="text-sm text-accent">{error}</p>}
     </>
+  );
+}
+
+const SUG_LABEL: Record<string, string> = {
+  spelling: "Spelling",
+  grammar: "Grammar",
+  punctuation: "Punctuation",
+  word_choice: "Word choice",
+  repetition: "Repetition",
+  clarity: "Clarity",
+  style: "Style",
+};
+const MECHANICAL = ["spelling", "grammar", "punctuation"];
+
+function GrammarPanel(props: {
+  state: { state: "idle" | "checking" | "done" | "error"; message?: string; found?: number };
+  suggestions: Suggestion[];
+  active: string | null;
+  onRun: () => void;
+  onAccept: (s: Suggestion) => void;
+  onDismiss: (s: Suggestion) => void;
+  onAcceptAll: (types: string[]) => void;
+  onFocus: (s: Suggestion) => void;
+}) {
+  const { state, suggestions } = props;
+  if (state.state === "idle") {
+    return (
+      <Card className="text-sm">
+        <p>Check this chapter for spelling, grammar, punctuation and a few line edits. Your voice and dialogue are left alone.</p>
+        <button onClick={props.onRun} className={`${buttonClass} mt-3`}>
+          Check grammar &amp; style
+        </button>
+      </Card>
+    );
+  }
+  if (state.state === "checking") return <Card className="animate-pulse text-sm text-muted">Checking the chapter…</Card>;
+  if (state.state === "error") {
+    return (
+      <Card className="text-sm">
+        <p className="text-accent">{state.message}</p>
+        <button onClick={props.onRun} className={`${ghostButtonClass} mt-3`}>
+          Try again
+        </button>
+      </Card>
+    );
+  }
+  const mechanical = suggestions.filter((sug) => MECHANICAL.includes(sug.type)).length;
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <span>
+          {suggestions.length === 0
+            ? state.found
+              ? "All suggestions handled."
+              : "No issues found."
+            : `${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"}`}
+        </span>
+        {mechanical > 1 && (
+          <button onClick={() => props.onAcceptAll(MECHANICAL)} className="rounded-full bg-line/60 px-2.5 py-1 hover:text-ink">
+            Accept all spelling &amp; grammar ({mechanical})
+          </button>
+        )}
+        <button onClick={props.onRun} className="ml-auto hover:text-ink">
+          Check again
+        </button>
+      </div>
+      {suggestions.map((sug) => (
+        <div
+          key={sug.id}
+          id={`sug-${sug.id}`}
+          className={`rounded-xl border bg-card p-4 text-sm transition ${props.active === sug.id ? "border-accent shadow-sm" : "border-line"}`}
+        >
+          <button onClick={() => props.onFocus(sug)} className="block w-full text-left">
+            <span className="text-xs font-medium text-reaction">{SUG_LABEL[sug.type] ?? sug.type}</span>
+            <span className="mt-1 block font-serif">
+              <del className="text-muted decoration-accent/60">{sug.quote}</del>{" "}
+              <span aria-hidden>→</span> <ins className="no-underline text-ink">{sug.replacement || "(remove)"}</ins>
+            </span>
+          </button>
+          <p className="mt-1.5 text-muted">{sug.explanation}</p>
+          <div className="mt-2 flex gap-3 text-xs">
+            <button onClick={() => props.onAccept(sug)} className="font-medium text-praise hover:underline">
+              Accept
+            </button>
+            <button onClick={() => props.onDismiss(sug)} className="text-muted hover:text-ink">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function IntentInput({ chapterId, initial }: { chapterId: string; initial: string }) {
+  const [open, setOpen] = useState(Boolean(initial));
+  const [value, setValue] = useState(initial);
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  const saved = useRef(initial);
+  const commit = async () => {
+    if (value.trim() === saved.current.trim()) return;
+    setState("saving");
+    await setChapterIntent(chapterId, value);
+    saved.current = value;
+    setState("saved");
+  };
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mt-1 text-sm text-muted hover:text-accent">
+        + What should this chapter do for the reader?
+      </button>
+    );
+  }
+  return (
+    <div className="mt-2 max-w-3xl">
+      <label className="flex items-baseline justify-between text-xs font-medium uppercase tracking-wider text-muted">
+        Your intent for this chapter
+        <span className="normal-case tracking-normal font-normal">
+          {state === "saving" ? "Saving…" : state === "saved" ? "Saved. The reader checks it on the next read." : "Checked on the next read"}
+        </span>
+      </label>
+      <textarea
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setState("idle");
+        }}
+        onBlur={commit}
+        rows={2}
+        placeholder="e.g. The reader should start to suspect Elena, and feel dread when the lights go out."
+        className="mt-1 w-full resize-y rounded-lg border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent"
+      />
+    </div>
+  );
+}
+
+const LANDED = {
+  yes: ["Landed", "bg-praise-soft text-praise"],
+  partly: ["Partly landed", "bg-issue-soft text-issue"],
+  no: ["Didn’t land", "bg-accent-soft text-accent"],
+} as const;
+
+function IntentCheckCard({ check }: { check: IntentCheck }) {
+  const [label, cls] = LANDED[check.landed];
+  return (
+    <Card className="text-sm">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium uppercase tracking-widest text-accent">Intent check</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{label}</span>
+      </div>
+      <p className="mt-2 text-muted">
+        You wanted: <span className="text-ink">{check.intent}</span>
+      </p>
+      <p className="mt-2">{check.explanation}</p>
+    </Card>
+  );
+}
+
+const VERDICT = {
+  fixed: ["Fixed", "bg-praise-soft text-praise"],
+  partly: ["Partly", "bg-issue-soft text-issue"],
+  still_there: ["Still there", "bg-accent-soft text-accent"],
+} as const;
+
+function RevisionCheckCard({ check, engagement }: { check: RevisionCheck; engagement: number | null }) {
+  const fixed = check.notes.filter((n) => n.verdict === "fixed").length;
+  const delta = check.previousEngagement != null && engagement != null ? engagement - check.previousEngagement : null;
+  return (
+    <Card className="text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium uppercase tracking-widest text-accent">Revision check</span>
+        {check.notes.length > 0 && (
+          <span className="text-muted">
+            {fixed} of {check.notes.length} earlier issues fixed
+          </span>
+        )}
+        {delta != null && (
+          <span className="ml-auto text-muted">
+            Engagement {check.previousEngagement} → <b className={delta > 0 ? "text-praise" : delta < 0 ? "text-accent" : "text-ink"}>{engagement}</b>
+          </span>
+        )}
+      </div>
+      {check.notes.length === 0 ? (
+        <p className="mt-2 text-muted">No earlier issues to check.</p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {check.notes.map((n, i) => {
+            const [label, cls] = VERDICT[n.verdict];
+            return (
+              <li key={i}>
+                <div className="flex items-start gap-2">
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{label}</span>
+                  <span className="font-serif italic text-muted">“{n.quote}”</span>
+                </div>
+                <p className="mt-1 pl-1">{n.explanation}</p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
   );
 }
 

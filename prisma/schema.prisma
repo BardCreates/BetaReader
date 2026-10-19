@@ -94,6 +94,8 @@ model Manuscript {
   chapters      Chapter[]
   report        BookReport?
   conversations Conversation[]
+  threads       ReaderThread[]
+  characters    Character[]
 
   @@index([userId])
 }
@@ -108,10 +110,13 @@ model Chapter {
   wordCount    Int
   createdAt    DateTime @default(now())
   contentUpdatedAt DateTime @default(now()) // last time the text changed
+  intent       String?  @db.Text // what the author wants the reader to feel/know/suspect here (checked after reading)
 
   manuscript    Manuscript     @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
   review        ChapterReview?
   conversations Conversation[]
+  threadsRaised   ReaderThread[] @relation("raisedIn")
+  threadsResolved ReaderThread[] @relation("resolvedIn")
 
   @@unique([manuscriptId, index])
 }
@@ -131,6 +136,8 @@ model ChapterReview {
   predictions Json?        // string[] — what the reader thinks will happen
   memory     String?       @db.Text // running "reader memory" handed to the next chapter
   readAt     DateTime?     // when the read started; content edited after this means the notes are out of date
+  intentCheck   Json?      // { landed: "yes"|"partly"|"no", explanation } when the chapter had an intent
+  revisionCheck Json?      // { previousEngagement, notes: [{quote, comment, authorStatus, verdict, explanation}] } on a re-read
 
   model        String?
   inputTokens  Int @default(0)
@@ -190,21 +197,77 @@ model BookReport {
   manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
 }
 
-// ─── Editor conversations ────────────────────────────────────────
+// ─── Reader journey ──────────────────────────────────────────────
+
+enum ThreadKind {
+  QUESTION   // something the reader is wondering about
+  PREDICTION // something the reader expects to happen
+}
+
+enum ThreadOutcome {
+  OPEN      // still carried
+  ANSWERED  // a question the story answered
+  CONFIRMED // a prediction that came true (a twist the reader saw coming)
+  REFUTED   // a prediction the story overturned (a surprise)
+}
+
+// A question or prediction the reader carried from one chapter onward.
+model ReaderThread {
+  id               String        @id @default(cuid())
+  manuscriptId     String
+  kind             ThreadKind
+  text             String        @db.Text
+  raisedChapterId  String
+  resolvedChapterId String?
+  outcome          ThreadOutcome @default(OPEN)
+  resolution       String?       @db.Text // how it was answered / what actually happened
+  createdAt        DateTime      @default(now())
+
+  manuscript     Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  raisedChapter  Chapter    @relation("raisedIn", fields: [raisedChapterId], references: [id], onDelete: Cascade)
+  resolvedChapter Chapter?  @relation("resolvedIn", fields: [resolvedChapterId], references: [id], onDelete: SetNull)
+
+  @@index([manuscriptId])
+}
+
+// ─── Characters ──────────────────────────────────────────────────
+
+model Character {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  name         String
+  aliases      Json?    // string[]: other names the text uses ("Mara", "Mrs. Holt")
+  role         String?  // protagonist, antagonist, supporting…
+  summary      String?  @db.Text // who they are, drawn from the manuscript
+  notes        String?  @db.Text // the author's own notes / character bible
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  manuscript    Manuscript     @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@index([manuscriptId])
+}
+
+// ─── Conversations (editor chat — off in v1 — and character chat) ─
 
 model Conversation {
   id           String   @id @default(cuid())
   manuscriptId String
   chapterId    String?
+  characterId  String?
+  asOfChapter  Int?     // character chat: what the character knows, up to this chapter (1-based); null = whole book
   title        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
   chapter    Chapter?   @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  character  Character? @relation(fields: [characterId], references: [id], onDelete: Cascade)
   messages   Message[]
 
   @@index([manuscriptId])
+  @@index([characterId])
 }
 
 model Message {

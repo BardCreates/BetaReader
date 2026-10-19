@@ -55,14 +55,21 @@ export function Markdown({ text }: { text: string }) {
 
 function inline(s: string): React.ReactNode[] {
   const out: React.ReactNode[] = [];
-  const re = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*|_[^_\s][^_]*_)/g;
+  // ⟦…⟧ marks details a character invented (not in the manuscript).
+  const re = /(⟦[^⟧]+⟧|\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*|_[^_\s][^_]*_)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let k = 0;
   while ((m = re.exec(s))) {
     if (m.index > last) out.push(s.slice(last, m.index));
     const t = m[0];
-    if (t.startsWith("**")) out.push(<strong key={k++}>{t.slice(2, -2)}</strong>);
+    if (t.startsWith("⟦"))
+      out.push(
+        <mark key={k++} className="invented" title="Invented in this chat, not in your manuscript">
+          {t.slice(1, -1)}
+        </mark>,
+      );
+    else if (t.startsWith("**")) out.push(<strong key={k++}>{t.slice(2, -2)}</strong>);
     else if (t.startsWith("`")) out.push(<code key={k++} className="rounded bg-line/60 px-1 text-[0.9em]">{t.slice(1, -1)}</code>);
     else out.push(<em key={k++}>{t.slice(1, -1)}</em>);
     last = m.index + t.length;

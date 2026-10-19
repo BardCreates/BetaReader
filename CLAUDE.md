@@ -13,3 +13,6 @@ AI beta reader for authors. Next.js 16 App Router + Prisma 7/Postgres + Auth.js 
 - Editor chat is switched off for v1 via `FEATURES.editorChat` in `src/lib/features.ts` (the user wants v1 focused on the read itself). Keep its code working, but don't surface it unless asked.
 - Chapters: `Chapter.doc` is the TipTap/ProseMirror JSON the editor saves; `Chapter.content` is the plain text derived from it (`docToPlain`) that the AI reads and notes anchor to. Always write both together (see `saveChapter`). `contentUpdatedAt` vs `ChapterReview.readAt` decides whether notes are out of date (`isReviewStale`).
 - Editor allows only paragraphs, hard breaks, scene breaks (horizontalRule), bold and italic; `sanitizeDoc` enforces this server-side.
+- Reader journey: `ReaderThread` rows are created/resolved inside `readChapter` (pipeline.ts). A re-read of chapter N first deletes threads raised in N and reopens ones resolved in N. The author's intent and previous issues are put AFTER the chapter text in the prompt so they can't bias the reaction.
+- Grammar & style and character discovery use `ANTHROPIC_LINE_MODEL` (default claude-haiku-5-5); reading and character chat use `ANTHROPIC_MODEL`.
+- Character chat: system prompt in `src/lib/reader/characters.ts`; invented details are wrapped in ⟦ ⟧ and rendered by `Markdown.tsx` as highlights.

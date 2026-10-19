@@ -38,12 +38,18 @@ export function readerSystemPrompt(ctx: ManuscriptContext) {
   return `${CORE_PRINCIPLES}\n\n${lensAndBrief(ctx)}`;
 }
 
+export type OpenThread = { id: string; kind: "question" | "prediction"; text: string; raisedIn: number };
+export type PreviousIssue = { id: string; quote: string; comment: string; authorStatus: "open" | "marked fixed" | "author disagreed" };
+
 export function chapterUserPrompt(args: {
   index: number;
   total: number;
   title: string;
   content: string;
   memory: string | null;
+  openThreads?: OpenThread[];
+  intent?: string | null;
+  previous?: { engagement: number | null; issues: PreviousIssue[] } | null;
 }) {
   const where =
     args.index === 0
@@ -53,8 +59,28 @@ export function chapterUserPrompt(args: {
     args.index === args.total - 1
       ? "\nThis is the final chapter. React to the ending: does it pay off what the book promised?"
       : "";
+  const threads = args.openThreads?.length
+    ? `\n\nQuestions and predictions you are carrying into this chapter:\n<open_list>\n${args.openThreads
+        .map((t) => `${t.id} (${t.kind}, from chapter ${t.raisedIn}): ${t.text}`)
+        .join("\n")}\n</open_list>\nIf this chapter settles any of them, list them in resolvedThreads by id.`
+    : "";
 
-  return `${where}
+  // Shown AFTER the chapter, so the reaction is formed first.
+  const after: string[] = [];
+  if (args.intent?.trim()) {
+    after.push(`The author has told you what they intended for this chapter. Do NOT let it change your reaction, notes or memory; those are your honest first-read experience. Use it only for intentCheck:
+<author_intent>
+${args.intent.trim()}
+</author_intent>`);
+  }
+  if (args.previous?.issues.length) {
+    after.push(`The author revised this chapter since your last read (you gave it ${args.previous.engagement ?? "?"}/10 then). These are the issues you raised last time. For each, fill revisionCheck by id: is it fixed in this version?
+<previous_issues>
+${args.previous.issues.map((i) => `${i.id} [${i.authorStatus}] "${i.quote}" — ${i.comment}`).join("\n")}
+</previous_issues>`);
+  }
+
+  return `${where}${threads}
 
 Now read chapter ${args.index + 1} of ${args.total}: "${args.title}".${ending}
 
@@ -62,7 +88,9 @@ Now read chapter ${args.index + 1} of ${args.total}: "${args.title}".${ending}
 ${args.content}
 </chapter>
 
-Read it, then respond with your reaction, inline notes quoting exact passages, and your updated reader memory, in the required JSON format.`;
+Read it, then respond with your reaction, inline notes quoting exact passages, and your updated reader memory, in the required JSON format.${
+    after.length ? `\n\n${after.join("\n\n")}` : "\nLeave out intentCheck and revisionCheck."
+  }`;
 }
 
 export function bookReportUserPrompt(args: {
@@ -77,7 +105,15 @@ export function bookReportUserPrompt(args: {
     questions: string[];
   }[];
   finalMemory: string | null;
+  ledger?: { unanswered: string[]; guessed: string[]; surprises: string[] };
 }) {
+  const ledger = args.ledger
+    ? `\n\n<reader_journey>
+Questions you raised that the book never answered: ${args.ledger.unanswered.join(" | ") || "none"}
+Predictions that came true (twists you saw coming): ${args.ledger.guessed.join(" | ") || "none"}
+Predictions the story overturned (surprises): ${args.ledger.surprises.join(" | ") || "none"}
+</reader_journey>`
+    : "";
   const body = args.chapters
     .map(
       (c) => `<chapter_read number="${c.number}" title="${c.title}" words="${c.wordCount}" engagement="${c.engagement ?? "?"}">
@@ -95,7 +131,7 @@ ${body}
 
 <final_reader_memory>
 ${args.finalMemory ?? ""}
-</final_reader_memory>
+</final_reader_memory>${ledger}
 
 Step back and assess the book as a whole, like a developmental editor writing to the author after a full read.
 Look for patterns across chapters, not just repeats of individual notes. Note which questions you were carrying were answered and which were left hanging.

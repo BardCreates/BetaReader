@@ -102,3 +102,28 @@ mark.note[data-active="true"] { outline-color: var(--color-accent); }
   height: 0;
   pointer-events: none;
 }
+
+/* Grammar & style suggestions */
+.editor-body .suggestion {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--color-reaction);
+  cursor: pointer;
+}
+.editor-body .suggestion[data-type="spelling"],
+.editor-body .suggestion[data-type="grammar"],
+.editor-body .suggestion[data-type="punctuation"] {
+  text-decoration-color: var(--color-accent);
+}
+
+/* Character chat: details not in the manuscript */
+mark.invented {
+  background: transparent;
+  color: inherit;
+  border-bottom: 2px dotted var(--color-issue);
+  background-image: linear-gradient(var(--color-issue-soft), var(--color-issue-soft));
+  border-radius: 2px;
+  padding: 0 2px;
+}

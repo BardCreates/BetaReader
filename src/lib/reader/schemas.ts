@@ -41,7 +41,14 @@ export const ChapterFeedbackSchema = z.object({
   notes: z.array(ChapterNoteSchema).default([]),
   questions: z.array(z.string()).default([]),
   predictions: z.array(z.string()).default([]),
+  resolvedThreads: z
+    .array(z.object({ id: z.string(), outcome: ciEnum(["answered", "confirmed", "refuted"]), resolution: z.string() }))
+    .default([]),
   memory: z.string().min(1),
+  intentCheck: z.object({ landed: ciEnum(["yes", "partly", "no"]), explanation: z.string() }).nullish(),
+  revisionCheck: z
+    .array(z.object({ id: z.string(), verdict: ciEnum(["fixed", "partly", "still_there"]), explanation: z.string() }))
+    .nullish(),
 });
 
 export type ChapterFeedback = z.infer<typeof ChapterFeedbackSchema>;
@@ -52,7 +59,7 @@ export const chapterFeedbackTool = {
   description: "Record your experience of reading this chapter, with inline notes anchored to exact passages.",
   input_schema: {
     type: "object" as const,
-    required: ["reaction", "summary", "engagement", "strengths", "notes", "questions", "predictions", "memory"],
+    required: ["reaction", "summary", "engagement", "strengths", "notes", "questions", "predictions", "resolvedThreads", "memory"],
     properties: {
       reaction: {
         type: "string",
@@ -100,13 +107,57 @@ export const chapterFeedbackTool = {
       questions: {
         type: "array",
         items: { type: "string" },
-        description: "Questions you are carrying into the next chapter (intended mysteries and unintended confusion alike).",
+        description:
+          "NEW questions this chapter raised that you'll carry forward (intended mysteries and unintended confusion alike). One short sentence each. Don't repeat ones already on your open list.",
       },
-      predictions: { type: "array", items: { type: "string" }, description: "What you think will happen next." },
+      predictions: {
+        type: "array",
+        items: { type: "string" },
+        description: "NEW predictions: what you now expect to happen later in the book. One short sentence each. Don't repeat ones already on your open list.",
+      },
+      resolvedThreads: {
+        type: "array",
+        description:
+          "Items from your open list (by id, e.g. Q2 or P1) that THIS chapter settled. answered = a question got its answer; confirmed = a prediction came true; refuted = the story went another way. Leave out anything still open.",
+        items: {
+          type: "object",
+          required: ["id", "outcome", "resolution"],
+          properties: {
+            id: { type: "string" },
+            outcome: { type: "string", enum: ["answered", "confirmed", "refuted"] },
+            resolution: { type: "string", description: "One sentence: how it was settled." },
+          },
+        },
+      },
       memory: {
         type: "string",
         description:
-          "Your updated reader's memory of the WHOLE story so far (max ~400 words): main characters and how you feel about them, active plot threads, setups awaiting payoff, open questions, tone. This is all you will remember when you read the next chapter.",
+          "Your updated reader's memory of the WHOLE story so far (max ~400 words): main characters and how you feel about them, active plot threads, setups awaiting payoff, open questions, tone. This is all you will remember when you read the next chapter. Never mention the author's intent or previous notes here.",
+      },
+      intentCheck: {
+        type: "object",
+        description: "Only when the author gave an intent for this chapter: did your actual experience match it?",
+        required: ["landed", "explanation"],
+        properties: {
+          landed: { type: "string", enum: ["yes", "partly", "no"] },
+          explanation: {
+            type: "string",
+            description: "2–4 sentences: what you actually felt or concluded, compared with what the author intended, and what would close the gap.",
+          },
+        },
+      },
+      revisionCheck: {
+        type: "array",
+        description: "Only when previous issues are listed: for each, by id (e.g. N1), whether this version fixed it.",
+        items: {
+          type: "object",
+          required: ["id", "verdict", "explanation"],
+          properties: {
+            id: { type: "string" },
+            verdict: { type: "string", enum: ["fixed", "partly", "still_there"] },
+            explanation: { type: "string", description: "One or two sentences, quoting the revised text where useful." },
+          },
+        },
       },
     },
   },
