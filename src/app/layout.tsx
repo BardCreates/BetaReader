@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Inter, Literata } from "next/font/google";
+// Fonts are bundled with the app (no download at build/dev time — next/font/google
+// fails in some Windows/offline/proxied environments).
+import "@fontsource-variable/inter";
+import "@fontsource-variable/literata";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const literata = Literata({ subsets: ["latin"], variable: "--font-literata" });
 
 export const metadata: Metadata = {
   title: { default: "Beta Reader", template: "%s · Beta Reader" },
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${literata.variable}`}>
+    <html lang="en">
       <body className="min-h-screen font-sans antialiased">{children}</body>
     </html>
   );
