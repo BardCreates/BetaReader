@@ -43,11 +43,22 @@ export function Sidebar({ email, data }: { email: string | null; data: SidebarDa
             <NavLink href={`${base}/journey`} active={pathname === `${base}/journey`}>
               Reader journey
             </NavLink>
+            <NavLink href={`${base}/bible`} active={pathname === `${base}/bible`}>
+              Story bible
+              {ms.continuityIssues > 0 && (
+                <span className="ml-auto rounded-full bg-issue-soft px-1.5 text-xs font-medium text-issue tabular-nums" title="Open continuity problems">
+                  {ms.continuityIssues}
+                </span>
+              )}
+            </NavLink>
             {FEATURES.characterChat && (
               <NavLink href={`${base}/characters`} active={pathname.startsWith(`${base}/characters`)}>
                 Characters
               </NavLink>
             )}
+            <NavLink href={`${base}/pitch`} active={pathname === `${base}/pitch`}>
+              Pitch kit
+            </NavLink>
             <Divider />
             <p className="flex items-baseline justify-between px-2.5 pb-1 text-xs font-medium text-muted">
               Chapters <span className="tabular-nums">{ms.chapters.length}</span>

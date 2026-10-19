@@ -37,3 +37,20 @@ test("without intent or previous issues, the optional checks are skipped", () =>
   assert.match(p, /Leave out intentCheck and revisionCheck/);
   assert.doesNotMatch(p, /<open_list>/);
 });
+
+test("story bible is grouped by subject, given ids, and placed before the chapter", () => {
+  const p = chapterUserPrompt({
+    ...base,
+    bible: [
+      { id: "F1", subject: "Saul", fact: "Saul is injured in the left leg.", chapter: 1 },
+      { id: "F2", subject: "Mara", fact: "Mara has grey eyes.", chapter: 1 },
+      { id: "F3", subject: "saul", fact: "Saul is a Ghost Knight.", chapter: 2 },
+    ],
+  });
+  assert.ok(p.indexOf("<story_bible>") < p.indexOf("<chapter>"));
+  assert.match(p, /Saul\n {2}F1 \(ch\. 1\) Saul is injured in the left leg\.\n {2}F3 \(ch\. 2\) Saul is a Ghost Knight\./);
+});
+
+test("no story bible section for the first chapter", () => {
+  assert.ok(!chapterUserPrompt({ ...base, index: 0, bible: [] }).includes("<story_bible>"));
+});

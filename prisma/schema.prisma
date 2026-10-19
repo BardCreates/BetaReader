@@ -96,6 +96,8 @@ model Manuscript {
   conversations Conversation[]
   threads       ReaderThread[]
   characters    Character[]
+  facts         StoryFact[]
+  pitchKit      PitchKit?
 
   @@index([userId])
 }
@@ -117,6 +119,7 @@ model Chapter {
   conversations Conversation[]
   threadsRaised   ReaderThread[] @relation("raisedIn")
   threadsResolved ReaderThread[] @relation("resolvedIn")
+  facts           StoryFact[]
 
   @@unique([manuscriptId, index])
 }
@@ -280,4 +283,42 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
+}
+
+// ─── Story bible & continuity ────────────────────────────────────
+
+// A concrete fact the reader learned in a chapter (a trait, relationship, injury, date, rule
+// of the world...). Later chapters are checked against the facts from earlier ones.
+model StoryFact {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  chapterId    String   // where it was established
+  subject      String   // who or what it's about: "Mara", "The Ghost Knights", "Timeline"
+  category     String   // character | place | object | timeline | world
+  fact         String   @db.Text
+  createdAt    DateTime @default(now())
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  chapter    Chapter    @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([manuscriptId])
+  @@index([chapterId])
+}
+
+// ─── Pitch kit ───────────────────────────────────────────────────
+
+// Logline, blurb, synopsis and query letter, written from the reader's experience of the book.
+model PitchKit {
+  id           String        @id @default(cuid())
+  manuscriptId String        @unique
+  status       ReadingStatus @default(QUEUED)
+  error        String?       @db.Text
+  content      Json?         // see PitchKitSchema in src/lib/reader/schemas.ts
+  model        String?
+  inputTokens  Int @default(0)
+  outputTokens Int @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
 }

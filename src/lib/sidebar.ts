@@ -8,6 +8,8 @@ export type SidebarManuscript = {
   id: string;
   title: string;
   reading: boolean;
+  /** Open continuity problems across the book. */
+  continuityIssues: number;
   chapters: { index: number; title: string; wordCount: number; state: ChapterState; engagement: number | null }[];
 };
 
@@ -46,6 +48,9 @@ export async function getSidebar(userId: string, manuscriptId?: string): Promise
     },
   });
   if (!ms) return null;
+  const continuityIssues = await db.note.count({
+    where: { category: "continuity", status: "OPEN", review: { chapter: { manuscriptId: ms.id } } },
+  });
 
   const reading = (ms.status === "QUEUED" || ms.status === "READING") && !isStale(ms.status, ms.updatedAt);
   return {
@@ -54,6 +59,7 @@ export async function getSidebar(userId: string, manuscriptId?: string): Promise
       id: ms.id,
       title: ms.title,
       reading,
+      continuityIssues,
       chapters: ms.chapters.map((c) => {
         const r = c.review;
         let state: ChapterState = "unread";

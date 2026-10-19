@@ -12,8 +12,12 @@ export function StatusBadge({ status }: { status: ReadingStatus }) {
   return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
 }
 
-export function Card({ className = "", children }: { className?: string; children: React.ReactNode }) {
-  return <div className={`rounded-xl border border-line bg-card p-5 ${className}`}>{children}</div>;
+export function Card({ className = "", children, ...rest }: React.HTMLAttributes<HTMLDivElement> & { "data-testid"?: string }) {
+  return (
+    <div {...rest} className={`rounded-xl border border-line bg-card p-5 ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 export const buttonClass =

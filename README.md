@@ -23,6 +23,9 @@ upload (.docx/.txt/.md or paste)
 - **Grammar & style.** On demand, on a smaller model (`ANTHROPIC_LINE_MODEL`); suggestions are underlined in the editor with accept/dismiss (`src/lib/reader/lineEdit.ts`).
 - **Character chat.** Characters are found in the manuscript (or added by hand) and talk in voice, grounded in the passages they appear in (`src/lib/reader/characterContext.ts`); invented details are marked ⟦like this⟧; knowledge can be limited to a chapter; replies can be saved to the character's notes.
 - **Editor chat (off in v1).** Switched off in `src/lib/features.ts` to keep v1 focused on the read; flip `editorChat` to bring it back. Streams replies with the book report, chapter summaries and (for chapter conversations) the full chapter text and notes in context (`src/lib/reader/editor.ts`).
+- **Update from a new draft.** Revise in Dabble, Word or Google Docs, export, and upload the new version (`/manuscripts/[id]/update`). Chapters are matched to the existing ones in order, by shared text and title (`src/lib/manuscript/match.ts`), so inserted, removed and renamed chapters line up; you see a preview before anything changes. Unchanged chapters keep their notes and reads; **Read the changes** reads only new and edited chapters, then refreshes the report.
+- **Continuity & story bible.** Each read records the concrete facts a chapter establishes (`StoryFact`: traits, injuries, timeline, places, rules of the world) and checks the chapter against facts from earlier chapters only. Contradictions become `continuity` notes anchored to the passage, citing the earlier fact. `/manuscripts/[id]/bible` lists the problems and the facts by subject.
+- **Pitch kit.** After a full read: logline, back-cover blurb, synopsis, query letter, selling points, comp suggestions, and honest notes on what made the book hard to pitch (`src/lib/reader/pitch.ts`, `/manuscripts/[id]/pitch`). Built from the read's summaries and report, not the full text, so it's cheap.
 - **Write in the app.** A left menu lists every chapter like a book outline. Each chapter opens in an editor (paragraphs, bold, italic, scene breaks) that autosaves. The reader's notes stay beside the text and their highlights follow your edits; chapters you've changed since their last read are marked, and **Re-read this chapter** gets fresh feedback when you're ready. Chapters are stored as formatted documents (`Chapter.doc`) with a plain-text copy (`Chapter.content`) that the AI reads and notes anchor to — see `src/lib/manuscript/doc.ts`.
 
 ## Stack
@@ -69,6 +72,9 @@ src/app/manuscripts/new         upload form
 src/app/manuscripts/[id]        overview + book report
 src/app/manuscripts/[id]/chapters/[n]   chapter text with inline notes
 src/app/manuscripts/[id]/editor          editor conversations
+src/app/manuscripts/[id]/update          update from a new draft (preview + apply)
+src/app/manuscripts/[id]/bible           story bible + continuity problems
+src/app/manuscripts/[id]/pitch           pitch kit
 src/lib/manuscript              import, chapter splitting, quote anchoring (+ tests)
 src/lib/reader                  prompts, personas, schemas, pipeline, editor context
 src/lib/plans.ts                plan limits (free / author / pro)

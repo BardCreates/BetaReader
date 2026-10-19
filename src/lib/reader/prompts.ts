@@ -38,6 +38,8 @@ export function readerSystemPrompt(ctx: ManuscriptContext) {
   return `${CORE_PRINCIPLES}\n\n${lensAndBrief(ctx)}`;
 }
 
+export type BibleFact = { id: string; subject: string; fact: string; chapter: number };
+
 export type OpenThread = { id: string; kind: "question" | "prediction"; text: string; raisedIn: number };
 export type PreviousIssue = { id: string; quote: string; comment: string; authorStatus: "open" | "marked fixed" | "author disagreed" };
 
@@ -48,6 +50,7 @@ export function chapterUserPrompt(args: {
   content: string;
   memory: string | null;
   openThreads?: OpenThread[];
+  bible?: BibleFact[];
   intent?: string | null;
   previous?: { engagement: number | null; issues: PreviousIssue[] } | null;
 }) {
@@ -65,6 +68,10 @@ export function chapterUserPrompt(args: {
         .join("\n")}\n</open_list>\nIf this chapter settles any of them, list them in resolvedThreads by id.`
     : "";
 
+  const bible = args.bible?.length
+    ? `\n\nYour story bible: concrete facts established in earlier chapters. Check this chapter against it and report contradictions in continuity, citing the fact's id.\n<story_bible>\n${formatBible(args.bible)}\n</story_bible>`
+    : "";
+
   // Shown AFTER the chapter, so the reaction is formed first.
   const after: string[] = [];
   if (args.intent?.trim()) {
@@ -80,7 +87,7 @@ ${args.previous.issues.map((i) => `${i.id} [${i.authorStatus}] "${i.quote}" — 
 </previous_issues>`);
   }
 
-  return `${where}${threads}
+  return `${where}${threads}${bible}
 
 Now read chapter ${args.index + 1} of ${args.total}: "${args.title}".${ending}
 
@@ -88,9 +95,23 @@ Now read chapter ${args.index + 1} of ${args.total}: "${args.title}".${ending}
 ${args.content}
 </chapter>
 
-Read it, then respond with your reaction, inline notes quoting exact passages, and your updated reader memory, in the required JSON format.${
+Read it, then respond with your reaction, inline notes quoting exact passages, your updated reader memory, new story-bible facts and any continuity errors, in the required JSON format.${
     after.length ? `\n\n${after.join("\n\n")}` : "\nLeave out intentCheck and revisionCheck."
   }`;
+}
+
+/** Facts grouped by subject so related details sit together: "Saul\n  F3 (ch. 1) ..." */
+export function formatBible(facts: BibleFact[]): string {
+  const groups = new Map<string, BibleFact[]>();
+  for (const f of facts) {
+    const key = f.subject.trim();
+    const list = groups.get(key.toLowerCase()) ?? [];
+    list.push({ ...f, subject: key });
+    groups.set(key.toLowerCase(), list);
+  }
+  return [...groups.values()]
+    .map((list) => `${list[0].subject}\n${list.map((f) => `  ${f.id} (ch. ${f.chapter}) ${f.fact}`).join("\n")}`)
+    .join("\n");
 }
 
 export function bookReportUserPrompt(args: {

@@ -158,6 +158,20 @@ export function ChapterWorkspace(p: Props) {
     document.getElementById(`note-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, []);
 
+  // Deep link from elsewhere (story bible, report): ?note=<id> opens the chapter at that note.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("note");
+    if (!id || !notes.some((n) => n.id === id)) return;
+    setShowClosed(true);
+    const t = setTimeout(() => {
+      focusCard(id);
+      editorRef.current?.revealNote(id);
+    }, 300);
+    return () => clearTimeout(t);
+    // Only on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ─── Grammar & style ───────────────────────────────────────────
   const [tab, setTab] = useState<"notes" | "grammar">("notes");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);

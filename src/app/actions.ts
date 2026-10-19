@@ -87,6 +87,7 @@ export async function startReading(manuscriptId: string, fresh = false) {
         db.chapterReview.deleteMany({ where: { chapter: { manuscriptId } } }),
         db.bookReport.deleteMany({ where: { manuscriptId } }),
         db.readerThread.deleteMany({ where: { manuscriptId } }),
+        db.storyFact.deleteMany({ where: { manuscriptId } }),
       ]);
     }
     // Respond immediately; the read continues after the response is sent.

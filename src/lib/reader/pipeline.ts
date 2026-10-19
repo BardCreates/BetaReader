@@ -51,12 +51,13 @@ export function isStale(status: string, updatedAt: Date) {
 /**
  * Read the manuscript chapter by chapter, in order, carrying the reader's memory forward,
  * then write the whole-book report. Resumable: chapters already DONE are skipped, so
- * re-running after a failure picks up where it stopped.
+ * re-running after a failure picks up where it stopped. With `rereadChanged`, chapters
+ * edited since their read are read again too (the "read changes" flow after a revision).
  *
  * NOTE: this runs in-process (via `after()`). For production at scale move it to a
  * durable job runner (Inngest, Trigger.dev, a queue + worker) — see README.
  */
-export async function readManuscript(manuscriptId: string) {
+export async function readManuscript(manuscriptId: string, opts: { rereadChanged?: boolean } = {}) {
   const ms = await db.manuscript.findUnique({
     where: { id: manuscriptId },
     include: { chapters: { orderBy: { index: "asc" }, select: { id: true } } },
@@ -78,11 +79,13 @@ export async function readManuscript(manuscriptId: string) {
 
   try {
     let memory: string | null = null;
+    let wordsRead = 0;
     for (const { id } of ms.chapters) {
       // Re-fetch each chapter so the read always uses its latest text and review state.
       const chapter = await db.chapter.findUnique({ where: { id }, include: { review: true } });
       if (!chapter) throw new Error("A chapter was removed during the read.");
-      if (chapter.review?.status === "DONE") {
+      const changed = opts.rereadChanged && isReviewStale(chapter.review, chapter.contentUpdatedAt);
+      if (chapter.review?.status === "DONE" && !changed) {
         memory = chapter.review.memory;
         continue;
       }
@@ -90,12 +93,13 @@ export async function readManuscript(manuscriptId: string) {
       // Heartbeat so a dead read can be detected and resumed (see claimManuscript).
       await db.manuscript.update({ where: { id: ms.id }, data: { updatedAt: new Date() } });
       memory = await readChapter({ system, chapter, total: ms.chapters.length, memory });
+      wordsRead += chapter.wordCount;
     }
     await writeBookReport(ms.id, ctx);
     await db.$transaction([
       db.manuscript.update({ where: { id: ms.id }, data: { status: "DONE" } }),
       // Usage metering for future billing.
-      db.user.update({ where: { id: ms.userId }, data: { wordsReadTotal: { increment: ms.wordCount } } }),
+      db.user.update({ where: { id: ms.userId }, data: { wordsReadTotal: { increment: wordsRead } } }),
     ]);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -155,6 +159,8 @@ const AUTHOR_STATUS = { OPEN: "open", RESOLVED: "marked fixed", DISMISSED: "auth
 const OUTCOME = { answered: "ANSWERED", confirmed: "CONFIRMED", refuted: "REFUTED" } as const;
 /** Cap on carried questions/predictions shown to the reader, newest kept. */
 const MAX_OPEN_THREADS = 40;
+/** Cap on story-bible facts shown to the reader (~6k tokens), newest kept. */
+const MAX_BIBLE_FACTS = 300;
 
 async function readChapter(args: {
   system: { type: "text"; text: string; cache_control: { type: "ephemeral" } }[];
@@ -191,6 +197,7 @@ async function readChapter(args: {
     // Reader journey: forget what this chapter raised or settled last time, then gather
     // everything the reader is carrying into it (raised earlier, not settled before it).
     await db.$transaction([
+      db.storyFact.deleteMany({ where: { chapterId: chapter.id } }),
       db.readerThread.deleteMany({ where: { raisedChapterId: chapter.id } }),
       db.readerThread.updateMany({
         where: { resolvedChapterId: chapter.id },
@@ -216,6 +223,17 @@ async function readChapter(args: {
       raisedIn: t.raisedChapter.index + 1,
     }));
 
+    // Story bible: facts from earlier chapters only (the reader never sees ahead).
+    const bible = (
+      await db.storyFact.findMany({
+        where: { manuscriptId: chapter.manuscriptId, chapter: { index: { lt: chapter.index } } },
+        include: { chapter: { select: { index: true } } },
+        orderBy: [{ chapter: { index: "asc" } }, { createdAt: "asc" }],
+      })
+    )
+      .slice(-MAX_BIBLE_FACTS)
+      .map((f, i) => ({ id: `F${i + 1}`, subject: f.subject, fact: f.fact, chapter: f.chapter.index + 1 }));
+
     const { data, usage } = await callStructured({
       system: args.system,
       user: chapterUserPrompt({
@@ -225,6 +243,7 @@ async function readChapter(args: {
         content: chapter.content,
         memory: args.memory,
         openThreads,
+        bible,
         intent: chapter.intent,
         previous: previousIssues.length ? { engagement: previousEngagement, issues: previousIssues } : null,
       }),
@@ -255,6 +274,30 @@ async function readChapter(args: {
         suggestion: n.suggestion ?? null,
       };
     });
+
+    const factById = new Map(bible.map((f) => [f.id, f]));
+    for (const c of data.continuity) {
+      const earlier = c.conflictsWith ? factById.get(c.conflictsWith.trim().toUpperCase()) : undefined;
+      const anchor = findQuote(text, c.quote, 0);
+      notes.push({
+        reviewId: review.id,
+        kind: "ISSUE",
+        category: "continuity",
+        severity: 2,
+        quote: c.quote,
+        startOffset: anchor?.start ?? null,
+        endOffset: anchor?.end ?? null,
+        comment: earlier ? `${c.explanation} (Earlier, in chapter ${earlier.chapter}: ${earlier.fact})` : c.explanation,
+        suggestion: c.suggestion ?? null,
+      });
+    }
+    const facts: Prisma.StoryFactCreateManyInput[] = data.facts.map((f) => ({
+      manuscriptId: chapter.manuscriptId,
+      chapterId: chapter.id,
+      subject: f.subject.trim().slice(0, 120),
+      category: f.category,
+      fact: f.fact.trim(),
+    }));
 
     const byLabel = new Map(openThreads.map((t) => [t.id.toUpperCase(), t.threadId]));
     const resolutions = data.resolvedThreads.flatMap((r) => {
@@ -287,6 +330,7 @@ async function readChapter(args: {
       db.note.deleteMany({ where: { reviewId: review.id } }),
       db.note.createMany({ data: notes }),
       db.readerThread.createMany({ data: newThreads }),
+      db.storyFact.createMany({ data: facts }),
       ...resolutions.map((r) =>
         db.readerThread.update({
           where: { id: r.threadId },

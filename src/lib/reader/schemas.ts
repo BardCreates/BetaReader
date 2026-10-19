@@ -24,6 +24,8 @@ export const NOTE_CATEGORIES = [
 
 // ─── Chapter read ────────────────────────────────────────────────
 
+export const FACT_CATEGORIES = ["character", "place", "object", "timeline", "world"] as const;
+
 export const ChapterNoteSchema = z.object({
   kind: ciEnum(["reaction", "praise", "issue"]),
   category: ciEnum(NOTE_CATEGORIES),
@@ -45,6 +47,17 @@ export const ChapterFeedbackSchema = z.object({
     .array(z.object({ id: z.string(), outcome: ciEnum(["answered", "confirmed", "refuted"]), resolution: z.string() }))
     .default([]),
   memory: z.string().min(1),
+  facts: z.array(z.object({ subject: z.string().min(1), category: ciEnum(FACT_CATEGORIES).catch("world"), fact: z.string().min(1) })).default([]),
+  continuity: z
+    .array(
+      z.object({
+        quote: z.string().min(3),
+        conflictsWith: z.string().nullish(),
+        explanation: z.string().min(1),
+        suggestion: z.string().nullish(),
+      }),
+    )
+    .default([]),
   intentCheck: z.object({ landed: ciEnum(["yes", "partly", "no"]), explanation: z.string() }).nullish(),
   revisionCheck: z
     .array(z.object({ id: z.string(), verdict: ciEnum(["fixed", "partly", "still_there"]), explanation: z.string() }))
@@ -59,7 +72,19 @@ export const chapterFeedbackTool = {
   description: "Record your experience of reading this chapter, with inline notes anchored to exact passages.",
   input_schema: {
     type: "object" as const,
-    required: ["reaction", "summary", "engagement", "strengths", "notes", "questions", "predictions", "resolvedThreads", "memory"],
+    required: [
+      "reaction",
+      "summary",
+      "engagement",
+      "strengths",
+      "notes",
+      "questions",
+      "predictions",
+      "resolvedThreads",
+      "memory",
+      "facts",
+      "continuity",
+    ],
     properties: {
       reaction: {
         type: "string",
@@ -133,6 +158,38 @@ export const chapterFeedbackTool = {
         type: "string",
         description:
           "Your updated reader's memory of the WHOLE story so far (max ~400 words): main characters and how you feel about them, active plot threads, setups awaiting payoff, open questions, tone. This is all you will remember when you read the next chapter. Never mention the author's intent or previous notes here.",
+      },
+      facts: {
+        type: "array",
+        description:
+          "Story bible: NEW concrete, checkable facts this chapter establishes that a later chapter could contradict. Physical details, ages, relationships, injuries and their effects, who knows what, dates and elapsed time, places and distances, objects and who has them, rules of the world. One short sentence each, stated plainly (\"Saul is injured in the left leg\"). Skip anything already in your story bible and anything vague or interpretive. Usually 3–12.",
+        items: {
+          type: "object",
+          required: ["subject", "category", "fact"],
+          properties: {
+            subject: { type: "string", description: "Who or what the fact is about, by the name the book uses (\"Saul\", \"The Ghost Knights\", \"Timeline\")." },
+            category: { type: "string", enum: [...FACT_CATEGORIES] },
+            fact: { type: "string" },
+          },
+        },
+      },
+      continuity: {
+        type: "array",
+        description:
+          "Continuity errors: places where this chapter contradicts your story bible or contradicts itself (a changed eye colour, a healed wound that's suddenly back, a character knowing something they weren't told, impossible timing, a name spelled two ways). Only real contradictions, not deliberate reveals or unreliable narration you can identify as such. Empty if none.",
+        items: {
+          type: "object",
+          required: ["quote", "explanation"],
+          properties: {
+            quote: { type: "string", description: "The contradicting passage, copied EXACTLY from this chapter, 5–40 words." },
+            conflictsWith: {
+              type: "string",
+              description: "The story bible id it contradicts (e.g. F12). Omit when the contradiction is inside this chapter.",
+            },
+            explanation: { type: "string", description: "What the contradiction is, stating both versions." },
+            suggestion: { type: "string", description: "How to reconcile it." },
+          },
+        },
       },
       intentCheck: {
         type: "object",
@@ -246,6 +303,71 @@ export const bookReportTool = {
         type: "array",
         items: { type: "string" },
         description: "An ordered revision plan: 4–8 steps, biggest structural work first, line polish last.",
+      },
+    },
+  },
+};
+
+// ─── Pitch kit ───────────────────────────────────────────────────
+
+export const PitchKitSchema = z.object({
+  logline: z.string().min(1),
+  blurb: z.string().min(1),
+  synopsis: z.string().min(1),
+  queryLetter: z.string().min(1),
+  sellingPoints: z.array(z.string()).default([]),
+  comps: z.array(z.object({ title: z.string(), author: z.string(), why: z.string() })).default([]),
+  pitchNotes: z.array(z.string()).default([]),
+});
+
+export type PitchKitContent = z.infer<typeof PitchKitSchema>;
+
+export const pitchKitTool = {
+  name: "submit_pitch_kit",
+  description: "Record the pitch materials for this manuscript.",
+  input_schema: {
+    type: "object" as const,
+    required: ["logline", "blurb", "synopsis", "queryLetter", "sellingPoints", "comps", "pitchNotes"],
+    properties: {
+      logline: {
+        type: "string",
+        description: "One or two sentences: protagonist, what they want, what stands in the way, and the stakes. No rhetorical questions.",
+      },
+      blurb: {
+        type: "string",
+        description:
+          "Back-cover copy, 150–250 words, in the genre's voice. Sets up the hook and stakes without spoiling the ending. Paragraphs separated by blank lines.",
+      },
+      synopsis: {
+        type: "string",
+        description:
+          "A one-page synopsis for agents, 500–800 words: present tense, third person, the whole plot INCLUDING the ending, main character names in CAPS on first mention. Covers the protagonist's arc as well as events. Paragraphs separated by blank lines.",
+      },
+      queryLetter: {
+        type: "string",
+        description:
+          "A query letter, 250–350 words: hook paragraph, a story paragraph or two with stakes, then a closing paragraph with title, genre, word count and comps. Use [square-bracket placeholders] for anything you don't know: agent name, personalisation, the author's bio. Never invent facts about the author.",
+      },
+      sellingPoints: {
+        type: "array",
+        items: { type: "string" },
+        description: "3–5 short lines: what makes this book stand out to its readers (premise, voice, tropes the genre's readers look for).",
+      },
+      comps: {
+        type: "array",
+        description:
+          "2–4 comparable titles: real, published books you are confident exist, ideally from the last several years, that share this book's audience. Leave the list short rather than guess.",
+        items: {
+          type: "object",
+          required: ["title", "author", "why"],
+          properties: { title: { type: "string" }, author: { type: "string" }, why: { type: "string", description: "One sentence: what they share." } },
+        },
+      },
+      pitchNotes: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Honest notes for the author on what made the book hard to pitch: an unclear goal or stakes, a premise that takes too long to arrive, a genre that's hard to pin down. Each one says what to change in the manuscript or pitch. Empty if pitching it was easy.",
       },
     },
   },

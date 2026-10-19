@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/auth";
 import { deleteManuscript, startReading } from "@/app/actions";
+import { readChangedChapters } from "@/app/reimportActions";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { Prose } from "@/components/Prose";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -9,12 +10,19 @@ import { buttonClass, Card, EngagementStrip, ghostButtonClass, StatusBadge } fro
 import { db } from "@/lib/db";
 import { FEATURES } from "@/lib/features";
 import { personaFor } from "@/lib/reader/personas";
-import { isStale } from "@/lib/reader/pipeline";
+import { MIN_WORDS_TO_READ, isReviewStale, isStale } from "@/lib/reader/pipeline";
 import type { BookReportContent } from "@/lib/reader/schemas";
 
-export default async function ManuscriptPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ManuscriptPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireUser();
   const { id } = await params;
+  const justUpdated = (await searchParams).updated !== undefined;
   const ms = await db.manuscript.findFirst({
     where: { id, userId: user.id },
     include: {
@@ -26,9 +34,12 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
           index: true,
           title: true,
           wordCount: true,
+          contentUpdatedAt: true,
           review: {
             select: {
               status: true,
+              readAt: true,
+              updatedAt: true,
               engagement: true,
               summary: true,
               error: true,
@@ -46,6 +57,11 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
   const doneCount = ms.chapters.filter((c) => c.review?.status === "DONE").length;
   const report = ms.report?.status === "DONE" ? (ms.report.content as BookReportContent) : null;
   const base = `/manuscripts/${ms.id}`;
+  // Chapters the reader hasn't seen in their current form: edited since their read, or never read.
+  const toRead = ms.chapters.filter(
+    (c) => c.wordCount >= MIN_WORDS_TO_READ && (!c.review || c.review.status !== "DONE" || isReviewStale(c.review, c.contentUpdatedAt)),
+  );
+  const showReadChanges = !busy && doneCount > 0 && toRead.length > 0 && ms.status !== "DRAFT";
 
   return (
     <>
@@ -66,10 +82,15 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
           <div className="flex flex-wrap gap-2">
             {!busy && (
               <form action={startReading.bind(null, ms.id, ms.status === "DONE")}>
-                <SubmitButton className={buttonClass} pendingLabel="Starting…" confirm={ms.status === "DONE" ? "Start a fresh read? This replaces the current notes and report." : undefined}>
+                <SubmitButton className={showReadChanges ? ghostButtonClass : buttonClass} pendingLabel="Starting…" confirm={ms.status === "DONE" ? "Start a fresh read? This replaces the current notes and report." : undefined}>
                   {ms.status === "DRAFT" ? "Start reading" : ms.status === "DONE" ? "Read again" : "Resume reading"}
                 </SubmitButton>
               </form>
+            )}
+            {!busy && (
+              <Link href={`${base}/update`} className={ghostButtonClass}>
+                Update from new draft
+              </Link>
             )}
             {FEATURES.editorChat && (
               <Link href={`${base}/editor`} className={ghostButtonClass}>
@@ -89,6 +110,33 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
               <div className="h-full rounded-full bg-reaction transition-all" style={{ width: `${(doneCount / ms.chapters.length) * 100}%` }} />
             </div>
           </Card>
+        )}
+        {showReadChanges && (
+          <Card className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 border-accent/40 bg-accent-soft/60" data-testid="read-changes">
+            <p className="min-w-0 flex-1 text-sm">
+              {justUpdated ? "Draft updated. " : ""}
+              <b>
+                {toRead.length} chapter{toRead.length === 1 ? " has" : "s have"} changed
+              </b>{" "}
+              since the reader last saw {toRead.length === 1 ? "it" : "them"}
+              <span className="text-muted">
+                {" "}
+                ({toRead
+                  .slice(0, 6)
+                  .map((c) => c.index + 1)
+                  .join(", ")}
+                {toRead.length > 6 ? "…" : ""}). Read just those and refresh the report, without starting over.
+              </span>
+            </p>
+            <form action={readChangedChapters.bind(null, ms.id)}>
+              <SubmitButton className={buttonClass} pendingLabel="Starting…">
+                Read the changes
+              </SubmitButton>
+            </form>
+          </Card>
+        )}
+        {justUpdated && !showReadChanges && !busy && (
+          <Card className="mt-6 text-sm text-muted">Draft updated.</Card>
         )}
         {stale && (
           <Card className="mt-6 border-danger/40 bg-danger-soft/60 text-sm text-danger">
