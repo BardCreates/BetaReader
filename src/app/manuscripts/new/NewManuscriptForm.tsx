@@ -66,7 +66,7 @@ export function NewManuscriptForm({ personas }: { personas: { id: string; label:
               key={m}
               type="button"
               onClick={() => setMode(m)}
-              className={`rounded-full px-3 py-1 ${mode === m ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}
+              className={`rounded-full px-3 py-1 ${mode === m ? "bg-accent-soft font-medium text-accent" : "text-muted hover:text-ink"}`}
             >
               {m === "file" ? "Upload a file" : "Paste text"}
             </button>
@@ -83,7 +83,7 @@ export function NewManuscriptForm({ personas }: { personas: { id: string; label:
         )}
       </Card>
 
-      {state?.error && <p className="rounded-lg bg-accent-soft px-4 py-3 text-sm text-accent">{state.error}</p>}
+      {state?.error && <p className="rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger">{state.error}</p>}
 
       <button className={buttonClass} disabled={pending}>
         {pending ? "Uploading…" : "Create manuscript"}

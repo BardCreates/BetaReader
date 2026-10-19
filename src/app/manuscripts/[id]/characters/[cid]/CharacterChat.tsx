@@ -130,7 +130,7 @@ export function CharacterChat(props: {
         )}
         {messages.map((m) =>
           m.role === "user" ? (
-            <div key={m.id} className="ml-auto max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-ink px-4 py-3 text-sm text-paper">
+            <div key={m.id} className="ml-auto max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-soft px-4 py-3 text-sm text-ink">
               {m.content}
             </div>
           ) : (
@@ -152,7 +152,7 @@ export function CharacterChat(props: {
         <div ref={bottom} />
       </div>
 
-      {error && <p className="mt-4 rounded-lg bg-accent-soft px-4 py-2 text-sm text-accent">{error}</p>}
+      {error && <p className="mt-4 rounded-lg bg-danger-soft px-4 py-2 text-sm text-danger">{error}</p>}
 
       <form
         className="sticky bottom-0 mt-6 flex gap-2 bg-paper py-3"

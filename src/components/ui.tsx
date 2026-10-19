@@ -6,7 +6,7 @@ export function StatusBadge({ status }: { status: ReadingStatus }) {
     QUEUED: ["Starting…", "bg-reaction-soft text-reaction"],
     READING: ["Reading…", "bg-reaction-soft text-reaction animate-pulse"],
     DONE: ["Read", "bg-praise-soft text-praise"],
-    ERROR: ["Stopped", "bg-accent-soft text-accent"],
+    ERROR: ["Stopped", "bg-danger-soft text-danger"],
   };
   const [label, cls] = map[status];
   return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
@@ -38,7 +38,7 @@ export function EngagementStrip({ values }: { values: { label: string; value: nu
         >
           <div
             className={`w-full max-w-6 rounded-t transition group-hover:opacity-80 ${
-              v.value == null ? "bg-line" : v.value >= 7 ? "bg-praise" : v.value >= 5 ? "bg-issue" : "bg-accent"
+              v.value == null ? "bg-line" : v.value >= 7 ? "bg-praise" : v.value >= 5 ? "bg-issue" : "bg-danger"
             }`}
             style={{ height: `${((v.value ?? 1) / 10) * 100}%` }}
           />

@@ -90,12 +90,12 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
           </Card>
         )}
         {stale && (
-          <Card className="mt-6 border-accent/40 bg-accent-soft/50 text-sm text-accent">
+          <Card className="mt-6 border-danger/40 bg-danger-soft/60 text-sm text-danger">
             The read stopped making progress (the server may have restarted). Resume to pick up where it left off.
           </Card>
         )}
         {ms.status === "ERROR" && ms.error && (
-          <Card className="mt-6 border-accent/40 bg-accent-soft/50 text-sm text-accent">{ms.error}</Card>
+          <Card className="mt-6 border-danger/40 bg-danger-soft/60 text-sm text-danger">{ms.error}</Card>
         )}
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_22rem]">
@@ -123,7 +123,7 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
               </Card>
             )}
             <form action={deleteManuscript.bind(null, ms.id)}>
-              <SubmitButton className="text-xs text-muted hover:text-accent" confirm="Delete this manuscript and all its feedback?">
+              <SubmitButton className="text-xs text-muted hover:text-danger" confirm="Delete this manuscript and all its feedback?">
                 Delete manuscript
               </SubmitButton>
             </form>
@@ -139,7 +139,7 @@ function ReportView({ report, base }: { report: BookReportContent; base: string 
   return (
     <>
       <Card>
-        <p className="text-xs font-medium uppercase tracking-widest text-accent">Editorial letter</p>
+        <p className="text-sm font-medium text-muted">Editorial letter</p>
         <p className="mt-3 font-serif text-xl leading-snug font-semibold">{report.headline}</p>
         <div className="manuscript mt-4 text-[1rem]">{report.letter}</div>
       </Card>
@@ -203,7 +203,7 @@ function ReportView({ report, base }: { report: BookReportContent; base: string 
               <p key={i}>
                 <span
                   className={`mr-2 rounded px-1.5 py-0.5 text-xs ${
-                    t.status === "resolved" ? "bg-praise-soft text-praise" : t.status === "dropped" ? "bg-accent-soft text-accent" : "bg-issue-soft text-issue"
+                    t.status === "resolved" ? "bg-praise-soft text-praise" : t.status === "dropped" ? "bg-danger-soft text-danger" : "bg-issue-soft text-issue"
                   }`}
                 >
                   {t.status}

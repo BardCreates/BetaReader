@@ -18,7 +18,6 @@ export default async function Home() {
 
       <section className="grid flex-1 items-center gap-12 py-12 md:grid-cols-2">
         <div>
-          <p className="mb-4 text-sm font-medium uppercase tracking-widest text-accent">For authors with a draft</p>
           <h1 className="font-serif text-4xl leading-tight font-semibold md:text-5xl">
             An honest first reader for your manuscript.
           </h1>

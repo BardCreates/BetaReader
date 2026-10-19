@@ -223,9 +223,9 @@ export function ChapterWorkspace(p: Props) {
       </div>
 
       {/* Status banners */}
-      {rereadError && <Banner tone="accent">{rereadError}</Banner>}
+      {rereadError && <Banner tone="danger">{rereadError}</Banner>}
       {busy && <Banner tone="reaction">The reader is reading this chapter. You can keep writing; new notes will appear when it’s done.</Banner>}
-      {!busy && p.review?.status === "ERROR" && <Banner tone="accent">The last read stopped: {p.review.error}</Banner>}
+      {!busy && p.review?.status === "ERROR" && <Banner tone="danger">The last read stopped: {p.review.error}</Banner>}
       {!busy && p.stale && (
         <Banner tone="issue">
           You’ve edited this chapter since it was read, so some notes may be out of date. Re-read it when you’re ready for fresh feedback.
@@ -236,7 +236,7 @@ export function ChapterWorkspace(p: Props) {
       {p.review?.status === "DONE" && p.review.reaction && (
         <details className="group mb-5 rounded-xl border border-line bg-card" open={!p.stale}>
           <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3 text-sm">
-            <span className="text-xs font-medium uppercase tracking-widest text-accent">The reader’s reaction</span>
+            <span className="font-serif text-base font-semibold">The reader’s reaction</span>
             {p.review.engagement != null && (
               <span className="text-muted">
                 Wanted to keep reading: <b className="text-ink">{p.review.engagement}/10</b>
@@ -312,7 +312,7 @@ export function ChapterWorkspace(p: Props) {
                 role="tab"
                 aria-selected={tab === k}
                 onClick={() => setTab(k)}
-                className={`flex-1 rounded-md px-3 py-1.5 ${tab === k ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}
+                className={`flex-1 rounded-md px-3 py-1.5 ${tab === k ? "bg-accent-soft font-medium text-accent" : "text-muted hover:text-ink"}`}
               >
                 {label}
               </button>
@@ -341,7 +341,7 @@ export function ChapterWorkspace(p: Props) {
                 <button
                   key={k}
                   onClick={() => setFilter(k)}
-                  className={`rounded-full px-2.5 py-1 ${filter === k ? "bg-ink text-paper" : "bg-line/60 text-muted hover:text-ink"}`}
+                  className={`rounded-full px-2.5 py-1 ${filter === k ? "bg-accent-soft font-medium text-accent" : "bg-line/60 text-muted hover:text-ink"}`}
                 >
                   {k === "ALL" ? "All" : KIND_LABEL[k]} ({k === "ALL" ? notes.length : notes.filter((n) => n.kind === k).length})
                 </button>
@@ -424,15 +424,15 @@ function SaveLabel({ state }: { state: SaveState }) {
     case "dirty":
       return <span>Unsaved changes</span>;
     case "error":
-      return <span className="text-accent">{state.message}</span>;
+      return <span className="text-danger">{state.message}</span>;
     default:
       return <span>{state.at ? "Saved" : "All changes saved"}</span>;
   }
 }
 
-function Banner({ tone, children }: { tone: "accent" | "reaction" | "issue"; children: React.ReactNode }) {
+function Banner({ tone, children }: { tone: "danger" | "reaction" | "issue"; children: React.ReactNode }) {
   const cls = {
-    accent: "border-accent/40 bg-accent-soft/50 text-accent",
+    danger: "border-danger/40 bg-danger-soft/60 text-danger",
     reaction: "border-reaction/40 bg-reaction-soft/50",
     issue: "border-issue/40 bg-issue-soft/50",
   }[tone];
@@ -473,7 +473,7 @@ function TitleInput({ chapterId, initial }: { chapterId: string; initial: string
         aria-label="Chapter title"
         className="w-full rounded-md border border-transparent bg-transparent px-1 -mx-1 font-serif text-3xl font-semibold outline-none hover:border-line focus:border-accent"
       />
-      {error && <p className="text-sm text-accent">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </>
   );
 }
@@ -514,7 +514,7 @@ function GrammarPanel(props: {
   if (state.state === "error") {
     return (
       <Card className="text-sm">
-        <p className="text-accent">{state.message}</p>
+        <p className="text-danger">{state.message}</p>
         <button onClick={props.onRun} className={`${ghostButtonClass} mt-3`}>
           Try again
         </button>
@@ -550,7 +550,7 @@ function GrammarPanel(props: {
           <button onClick={() => props.onFocus(sug)} className="block w-full text-left">
             <span className="text-xs font-medium text-reaction">{SUG_LABEL[sug.type] ?? sug.type}</span>
             <span className="mt-1 block font-serif">
-              <del className="text-muted decoration-accent/60">{sug.quote}</del>{" "}
+              <del className="text-muted decoration-danger/60">{sug.quote}</del>{" "}
               <span aria-hidden>→</span> <ins className="no-underline text-ink">{sug.replacement || "(remove)"}</ins>
             </span>
           </button>
@@ -590,9 +590,9 @@ function IntentInput({ chapterId, initial }: { chapterId: string; initial: strin
   }
   return (
     <div className="mt-2 max-w-3xl">
-      <label className="flex items-baseline justify-between text-xs font-medium uppercase tracking-wider text-muted">
+      <label className="flex items-baseline justify-between text-sm font-medium text-muted">
         Your intent for this chapter
-        <span className="normal-case tracking-normal font-normal">
+        <span className="text-xs font-normal">
           {state === "saving" ? "Saving…" : state === "saved" ? "Saved. The reader checks it on the next read." : "Checked on the next read"}
         </span>
       </label>
@@ -614,7 +614,7 @@ function IntentInput({ chapterId, initial }: { chapterId: string; initial: strin
 const LANDED = {
   yes: ["Landed", "bg-praise-soft text-praise"],
   partly: ["Partly landed", "bg-issue-soft text-issue"],
-  no: ["Didn’t land", "bg-accent-soft text-accent"],
+  no: ["Didn’t land", "bg-danger-soft text-danger"],
 } as const;
 
 function IntentCheckCard({ check }: { check: IntentCheck }) {
@@ -622,7 +622,7 @@ function IntentCheckCard({ check }: { check: IntentCheck }) {
   return (
     <Card className="text-sm">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium uppercase tracking-widest text-accent">Intent check</span>
+        <span className="font-serif text-base font-semibold">Intent check</span>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{label}</span>
       </div>
       <p className="mt-2 text-muted">
@@ -636,7 +636,7 @@ function IntentCheckCard({ check }: { check: IntentCheck }) {
 const VERDICT = {
   fixed: ["Fixed", "bg-praise-soft text-praise"],
   partly: ["Partly", "bg-issue-soft text-issue"],
-  still_there: ["Still there", "bg-accent-soft text-accent"],
+  still_there: ["Still there", "bg-danger-soft text-danger"],
 } as const;
 
 function RevisionCheckCard({ check, engagement }: { check: RevisionCheck; engagement: number | null }) {
@@ -645,7 +645,7 @@ function RevisionCheckCard({ check, engagement }: { check: RevisionCheck; engage
   return (
     <Card className="text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium uppercase tracking-widest text-accent">Revision check</span>
+        <span className="font-serif text-base font-semibold">Revision check</span>
         {check.notes.length > 0 && (
           <span className="text-muted">
             {fixed} of {check.notes.length} earlier issues fixed
@@ -653,7 +653,7 @@ function RevisionCheckCard({ check, engagement }: { check: RevisionCheck; engage
         )}
         {delta != null && (
           <span className="ml-auto text-muted">
-            Engagement {check.previousEngagement} → <b className={delta > 0 ? "text-praise" : delta < 0 ? "text-accent" : "text-ink"}>{engagement}</b>
+            Engagement {check.previousEngagement} → <b className={delta > 0 ? "text-praise" : delta < 0 ? "text-danger" : "text-ink"}>{engagement}</b>
           </span>
         )}
       </div>
@@ -693,7 +693,7 @@ function ChapterMenu({ chapterId, title }: { chapterId: string; title: string })
           <div className="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-line bg-card p-1 text-sm shadow-lg">
             <button
               disabled={pending}
-              className="w-full rounded-md px-3 py-2 text-left text-accent hover:bg-accent-soft"
+              className="w-full rounded-md px-3 py-2 text-left text-danger hover:bg-danger-soft"
               onClick={() => {
                 if (window.confirm(`Delete “${title}” and its notes? This can’t be undone.`)) start(() => deleteChapter(chapterId));
               }}
@@ -763,7 +763,7 @@ function NoteCard({ note, active, missing, onFocus, manuscriptId, chapterId }: {
             href={`/manuscripts/${manuscriptId}/editor?chapter=${chapterId}&q=${encodeURIComponent(ask)}`}
             className="ml-auto text-accent hover:underline"
           >
-            Ask the editor →
+            Ask the editor
           </Link>
         )}
       </div>

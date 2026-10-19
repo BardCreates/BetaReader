@@ -37,14 +37,14 @@ export default async function SignInPage() {
               await signIn("dev", { email: form.get("email"), redirectTo: "/dashboard" });
             }}
           >
-            <label className="text-xs font-medium uppercase tracking-wide text-muted">Dev login (local only)</label>
+            <label className="text-sm font-medium text-muted">Dev login (local only)</label>
             <input name="email" type="email" required placeholder="you@example.com" className={inputClass} />
             <button className={`${buttonClass} w-full`}>Sign in with email</button>
           </form>
         )}
 
         {!oauth.length && !dev && (
-          <p className="mt-6 text-sm text-accent">
+          <p className="mt-6 text-sm text-danger">
             No sign-in providers are configured. Set AUTH_GITHUB_ID / AUTH_GOOGLE_ID, or AUTH_DEV_LOGIN=true for local development.
           </p>
         )}

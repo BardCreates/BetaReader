@@ -49,7 +49,7 @@ export default async function CharacterPage({
           notes={c.notes ?? ""}
         />
         <section>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted">Conversations</p>
+          <h2 className="mb-2 font-serif text-base font-semibold">Conversations</h2>
           <Link href={base} className="mb-1 block rounded-lg border border-line px-3 py-2 text-sm font-medium hover:bg-line/40">
             + New conversation
           </Link>

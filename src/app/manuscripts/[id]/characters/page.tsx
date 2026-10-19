@@ -56,7 +56,7 @@ export default async function CharactersPage({ params }: { params: Promise<{ id:
                   </div>
                   <p className="mt-2 line-clamp-3 text-sm text-muted">{c.summary || c.notes || "No description yet."}</p>
                   <p className="mt-3 text-xs text-accent">
-                    {c._count.conversations ? `${c._count.conversations} conversation${c._count.conversations === 1 ? "" : "s"} · ` : ""}Talk to {c.name.split(" ")[0]} →
+                    {c._count.conversations ? `${c._count.conversations} conversation${c._count.conversations === 1 ? "" : "s"} · ` : ""}Talk to {c.name.split(" ")[0]}
                   </p>
                 </Card>
               </Link>

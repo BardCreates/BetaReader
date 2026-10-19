@@ -16,7 +16,7 @@ export function FindCharactersButton({ manuscriptId, hasAny }: { manuscriptId: s
       >
         {pending ? "Reading your manuscript…" : hasAny ? "Find more characters" : "Find characters in my manuscript"}
       </button>
-      {result?.error && <p className="text-sm text-accent">{result.error}</p>}
+      {result?.error && <p className="text-sm text-danger">{result.error}</p>}
       {result?.message && <p className="text-sm text-muted">{result.message}</p>}
     </div>
   );
@@ -35,7 +35,7 @@ export function AddCharacterForm({ manuscriptId }: { manuscriptId: string }) {
           {pending ? "Adding…" : "Add"}
         </button>
       </div>
-      {state?.error && <p className="mt-1 text-sm text-accent">{state.error}</p>}
+      {state?.error && <p className="mt-1 text-sm text-danger">{state.error}</p>}
     </form>
   );
 }

@@ -4,37 +4,62 @@
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Literata Variable", ui-serif, Georgia, serif;
 
-  --color-paper: #f7f3ec;
-  --color-card: #fffdf9;
-  --color-ink: #24201b;
-  --color-muted: #6f675d;
-  --color-line: #e4dccf;
-  --color-accent: #8a3b2a;      /* oxblood */
-  --color-accent-soft: #f3e2dc;
-  --color-praise: #2f6b4f;
-  --color-praise-soft: #dcefe4;
-  --color-issue: #9a5b12;
-  --color-issue-soft: #f8e7c9;
-  --color-reaction: #3b5b8a;
-  --color-reaction-soft: #dfe7f3;
+  /* Ink on paper: cool page, ink-blue accent. */
+  --color-paper: #f4f5f8;
+  --color-card: #ffffff;
+  --color-ink: #1b2130;
+  --color-muted: #5f6879;
+  --color-line: #e0e3ea;
+  --color-accent: #2b4985;
+  --color-accent-soft: #e5ebf6;
+  --color-danger: #b03a2e;
+  --color-danger-soft: #f8e3df;
+  --color-praise: #2c7051;
+  --color-praise-soft: #ddefe5;
+  --color-issue: #96580f;
+  --color-issue-soft: #f6e8d2;
+  --color-reaction: #6447a0;
+  --color-reaction-soft: #ece5f6;
 }
 
+/* Night reading: deep slate, lamp-lit ink. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-paper: #191714;
-    --color-card: #221f1b;
-    --color-ink: #ede6da;
-    --color-muted: #a39a8d;
-    --color-line: #38332c;
-    --color-accent: #e08a74;
-    --color-accent-soft: #3a2621;
-    --color-praise: #7cc3a0;
-    --color-praise-soft: #1f3329;
-    --color-issue: #e3ad62;
-    --color-issue-soft: #3a2d18;
-    --color-reaction: #92b2e3;
-    --color-reaction-soft: #1f2a3a;
+    --color-paper: #11141a;
+    --color-card: #181c24;
+    --color-ink: #e6e8ee;
+    --color-muted: #959dab;
+    --color-line: #272d38;
+    --color-accent: #93abe4;
+    --color-accent-soft: #1d2639;
+    --color-danger: #ef8a7d;
+    --color-danger-soft: #361e1c;
+    --color-praise: #7cc5a0;
+    --color-praise-soft: #16271e;
+    --color-issue: #e2ae66;
+    --color-issue-soft: #2f2516;
+    --color-reaction: #b8a5ec;
+    --color-reaction-soft: #251f38;
   }
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+/* Quiet scrollbars that match the theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-accent-soft);
 }
 
 html,
@@ -115,7 +140,7 @@ mark.note[data-active="true"] { outline-color: var(--color-accent); }
 .editor-body .suggestion[data-type="spelling"],
 .editor-body .suggestion[data-type="grammar"],
 .editor-body .suggestion[data-type="punctuation"] {
-  text-decoration-color: var(--color-accent);
+  text-decoration-color: var(--color-danger);
 }
 
 /* Character chat: details not in the manuscript */
@@ -126,4 +151,10 @@ mark.invented {
   background-image: linear-gradient(var(--color-issue-soft), var(--color-issue-soft));
   border-radius: 2px;
   padding: 0 2px;
+}
+
+/* Text areas that grow with their content (falls back to a normal resizable box). */
+.grow-field {
+  field-sizing: content;
+  resize: vertical;
 }

@@ -92,7 +92,7 @@ export default async function JourneyPage({ params }: { params: Promise<{ id: st
         <>
           <section className="mt-10 grid gap-6 lg:grid-cols-3">
             <Stat
-              tone="accent"
+              tone="danger"
               title="Never answered"
               value={unanswered.length}
               note="Questions the reader raised that the book didn’t settle. Each is either a deliberate open end or a dropped thread."
@@ -127,8 +127,8 @@ export default async function JourneyPage({ params }: { params: Promise<{ id: st
   );
 }
 
-function Stat({ title, value, note, tone }: { title: string; value: number; note: string; tone: "accent" | "issue" | "praise" }) {
-  const color = { accent: "text-accent", issue: "text-issue", praise: "text-praise" }[tone];
+function Stat({ title, value, note, tone }: { title: string; value: number; note: string; tone: "danger" | "issue" | "praise" }) {
+  const color = { danger: "text-danger", issue: "text-issue", praise: "text-praise" }[tone];
   return (
     <Card>
       <p className="text-sm text-muted">{title}</p>
@@ -145,13 +145,13 @@ const OUTCOME_LABEL = {
   REFUTED: "Overturned",
 } as const;
 const OUTCOME_BAR = {
-  OPEN: "border-2 border-dashed border-accent bg-accent-soft/40",
+  OPEN: "border-2 border-dashed border-danger/70 bg-danger-soft/40",
   ANSWERED: "bg-reaction",
   CONFIRMED: "bg-issue",
   REFUTED: "bg-praise",
 } as const;
 const OUTCOME_CHIP = {
-  OPEN: "bg-accent-soft text-accent",
+  OPEN: "bg-danger-soft text-danger",
   ANSWERED: "bg-reaction-soft text-reaction",
   CONFIRMED: "bg-issue-soft text-issue",
   REFUTED: "bg-praise-soft text-praise",

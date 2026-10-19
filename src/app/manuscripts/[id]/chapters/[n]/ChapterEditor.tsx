@@ -316,7 +316,7 @@ function ToolButton(props: { label: string; active?: boolean; disabled?: boolean
       disabled={props.disabled}
       onMouseDown={(e) => e.preventDefault()} // keep the editor's selection
       onClick={props.onClick}
-      className={`h-8 min-w-8 rounded-md px-2 text-sm transition disabled:opacity-30 ${props.active ? "bg-ink text-paper" : "hover:bg-line/60"}`}
+      className={`h-8 min-w-8 rounded-md px-2 text-sm transition disabled:opacity-30 ${props.active ? "bg-accent-soft font-medium text-accent" : "hover:bg-line/60"}`}
     >
       {props.children}
     </button>
