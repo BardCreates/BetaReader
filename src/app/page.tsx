@@ -24,8 +24,8 @@ export default async function Home() {
           </h1>
           <p className="mt-6 text-lg text-muted">
             Upload your draft. Beta Reader reads it chapter by chapter, the way a real reader would, and tells you where it
-            was hooked, where it drifted, what confused it, and how to fix what isn’t working. Then talk it through like
-            you would with an editor.
+            was hooked, where it drifted, what confused it, and how to fix what isn’t working. Revise a chapter and it
+            reads it again.
           </p>
           <div className="mt-8 flex gap-3">
             <Link href="/signin" className={buttonClass}>
@@ -62,7 +62,7 @@ export default async function Home() {
         {[
           ["Reads in order", "Carries a memory of the story forward, so it notices broken setups, dropped threads and what it’s dying to know."],
           ["Notes on the page", "Every reaction and issue is anchored to the exact passage, with a concrete suggestion for the fix."],
-          ["An editor to talk to", "Ask why something isn’t landing, paste a revision, and get an honest second look."],
+          ["A full editorial report", "When it finishes the book: what’s working, what isn’t, which threads it dropped, and a revision plan in priority order."],
         ].map(([t, d]) => (
           <div key={t}>
             <h3 className="font-serif text-lg font-semibold">{t}</h3>

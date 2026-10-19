@@ -10,3 +10,4 @@ AI beta reader for authors. Next.js 16 App Router + Prisma 7/Postgres + Auth.js 
 - Model is configured with `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`).
 - Prisma 7: the client is generated into `src/generated/prisma` (gitignored; `npm install` runs `prisma generate`). Import types and the client from `@/generated/prisma/client`, never `@prisma/client`. The DB connection goes through `@prisma/adapter-pg` in `src/lib/db.ts`.
 - The dev email login only exists when `AUTH_DEV_LOGIN=true` and `NODE_ENV` is not production (`next dev`), by design.
+- Editor chat is switched off for v1 via `FEATURES.editorChat` in `src/lib/features.ts` (the user wants v1 focused on the read itself). Keep its code working, but don't surface it unless asked.

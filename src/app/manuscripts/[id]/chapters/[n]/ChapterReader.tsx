@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { reviseChapter, setNoteStatus } from "@/app/actions";
 import { buttonClass, Card, ghostButtonClass } from "@/components/ui";
 import { segmentText } from "@/lib/manuscript/anchor";
+import { FEATURES } from "@/lib/features";
 
 type NoteView = {
   id: string;
@@ -184,12 +185,14 @@ function NoteCard({ note, active, manuscriptId, chapterId, onFocus }: {
             Reopen
           </button>
         )}
-        <Link
-          href={`/manuscripts/${manuscriptId}/editor?chapter=${chapterId}&q=${encodeURIComponent(ask)}`}
-          className="ml-auto text-accent hover:underline"
-        >
-          Ask the editor →
-        </Link>
+        {FEATURES.editorChat && (
+          <Link
+            href={`/manuscripts/${manuscriptId}/editor?chapter=${chapterId}&q=${encodeURIComponent(ask)}`}
+            className="ml-auto text-accent hover:underline"
+          >
+            Ask the editor →
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { SubmitButton } from "@/components/SubmitButton";
 import { buttonClass, Card, EngagementStrip, ghostButtonClass, StatusBadge } from "@/components/ui";
 import { db } from "@/lib/db";
+import { FEATURES } from "@/lib/features";
 import { personaFor } from "@/lib/reader/personas";
 import { isStale } from "@/lib/reader/pipeline";
 import type { BookReportContent } from "@/lib/reader/schemas";
@@ -71,9 +72,11 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
                 </SubmitButton>
               </form>
             )}
-            <Link href={`${base}/editor`} className={ghostButtonClass}>
-              Talk to the editor
-            </Link>
+            {FEATURES.editorChat && (
+              <Link href={`${base}/editor`} className={ghostButtonClass}>
+                Talk to the editor
+              </Link>
+            )}
           </div>
         </div>
 

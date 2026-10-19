@@ -2,6 +2,7 @@ import { APIUserAbortError } from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { currentUserId } from "@/auth";
 import { db } from "@/lib/db";
+import { FEATURES } from "@/lib/features";
 import { MODEL, anthropic } from "@/lib/reader/anthropic";
 import { buildEditorSystem } from "@/lib/reader/editor";
 
@@ -15,6 +16,7 @@ const Body = z.object({
 
 /** Stream the editor's reply as plain text. The conversation id is returned in a header. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!FEATURES.editorChat) return new Response("Not found", { status: 404 });
   const userId = await currentUserId();
   if (!userId) return new Response("Unauthorized", { status: 401 });
   const { id: manuscriptId } = await params;

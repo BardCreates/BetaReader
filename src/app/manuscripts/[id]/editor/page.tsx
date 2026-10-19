@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/auth";
 import { AppHeader } from "@/components/AppHeader";
 import { db } from "@/lib/db";
+import { FEATURES } from "@/lib/features";
 import { EditorChat } from "./EditorChat";
 
 export const metadata = { title: "Editor" };
@@ -14,6 +15,7 @@ export default async function EditorPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  if (!FEATURES.editorChat) notFound();
   const user = await requireUser();
   const { id } = await params;
   const raw = await searchParams;
