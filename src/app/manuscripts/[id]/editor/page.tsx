@@ -53,7 +53,7 @@ export default async function EditorPage({
 
   return (
     <>
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-[16rem_1fr]">
+      <main className="grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-[16rem_1fr]">
         <aside className="space-y-1 text-sm">
           <Link href={`${base}/editor`} className="mb-3 block rounded-lg border border-line px-3 py-2 font-medium hover:bg-line/40">
             + New conversation

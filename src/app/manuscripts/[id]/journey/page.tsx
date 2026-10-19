@@ -64,7 +64,7 @@ export default async function JourneyPage({ params }: { params: Promise<{ id: st
   const readCount = engagement.filter((v) => v != null).length;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 sm:px-8">
+    <main className="max-w-6xl px-4 py-10 sm:px-8 lg:px-12">
       <h1 className="font-serif text-3xl font-semibold">Reader journey</h1>
       {threads.length > 0 ? (
         <p className="mt-2 max-w-3xl text-muted">

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/auth";
 import { deleteManuscript, startReading } from "@/app/actions";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { Prose } from "@/components/Prose";
 import { SubmitButton } from "@/components/SubmitButton";
 import { buttonClass, Card, EngagementStrip, ghostButtonClass, StatusBadge } from "@/components/ui";
 import { db } from "@/lib/db";
@@ -49,7 +50,7 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
   return (
     <>
       <AutoRefresh active={busy} />
-      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-8">
+      <main className="max-w-6xl px-4 py-10 sm:px-8 lg:px-12">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
@@ -141,7 +142,7 @@ function ReportView({ report, base }: { report: BookReportContent; base: string 
       <Card>
         <p className="text-sm font-medium text-muted">Editorial letter</p>
         <p className="mt-3 font-serif text-xl leading-snug font-semibold">{report.headline}</p>
-        <div className="manuscript mt-4 text-[1rem]">{report.letter}</div>
+        <Prose text={report.letter} className="mt-4 max-w-[68ch]" />
       </Card>
 
       <section>

@@ -20,7 +20,7 @@ export default async function Dashboard() {
 
   return (
     <AppShell email={user.email} sidebar={sidebar}>
-      <main className="mx-auto max-w-5xl px-4 py-10 sm:px-8">
+      <main className="max-w-5xl px-4 py-10 sm:px-8 lg:px-12">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
             <h1 className="font-serif text-3xl font-semibold">Your manuscripts</h1>

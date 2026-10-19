@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { checkGrammar, deleteChapter, renameChapter, rereadChapterNow, saveChapter, setChapterIntent, setNoteStatus } from "@/app/actions";
 import { buttonClass, Card, ghostButtonClass } from "@/components/ui";
+import { Prose } from "@/components/Prose";
 import { FEATURES } from "@/lib/features";
 import type { DocNode } from "@/lib/manuscript/doc";
 import { ChapterEditor, type ChapterEditorHandle, type Suggestion } from "./ChapterEditor";
@@ -204,7 +205,7 @@ export function ChapterWorkspace(p: Props) {
   const readLabel = p.review?.status === "DONE" ? "Re-read this chapter" : "Read this chapter";
 
   return (
-    <main className="mx-auto max-w-[96rem] px-4 py-6 sm:px-8">
+    <main className="max-w-[96rem] px-4 py-6 sm:px-8 lg:px-12">
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -244,8 +245,8 @@ export function ChapterWorkspace(p: Props) {
             )}
             <span className="ml-auto text-muted transition group-open:rotate-180">▾</span>
           </summary>
-          <div className="grid gap-5 border-t border-line px-5 py-4 md:grid-cols-[1fr_16rem]">
-            <div className="font-serif text-[1rem] leading-relaxed whitespace-pre-wrap">{p.review.reaction}</div>
+          <div className="grid gap-x-10 gap-y-5 border-t border-line px-5 py-4 md:grid-cols-[minmax(0,68ch)_16rem]">
+            <Prose text={p.review.reaction} className="max-w-[68ch]" />
             <div className="text-sm">
               <p className="text-muted">What I understood happened</p>
               <p className="mt-1">{p.review.summary}</p>
