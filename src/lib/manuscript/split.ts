@@ -17,11 +17,11 @@ const NUMBER_WORDS =
 const HEADING_PATTERNS: RegExp[] = [
   // Chapter 1 / Chapter One / Chapter Twenty-Three / Chapter IV, optional ":" / "-" / "." + title
   new RegExp(
-    `^(chapter|ch\\.)\\s+(\\d+|[ivxlcdm]+|(?:${NUMBER_WORDS})(?:[-\\s](?:${NUMBER_WORDS}))*)\\b\\s*([:.\\-–—]\\s*.*)?$`,
+    `^(chapter|ch\\.)\\s+(\\d+|[ivxlc]{1,7}|(?:${NUMBER_WORDS})(?:[-\\s](?:${NUMBER_WORDS}))*)\\b\\s*([:.\\-–—]\\s*.*)?$`,
     "i",
   ),
   /^(prologue|epilogue|interlude|afterword|foreword|introduction)\b\s*([:.\-–—]\s*.*)?$/i,
-  new RegExp(`^part\\s+(\\d+|[ivxlcdm]+|(?:${NUMBER_WORDS}))\\b\\s*([:.\\-–—]\\s*.*)?$`, "i"),
+  new RegExp(`^part\\s+(\\d+|[ivxlc]{1,7}|(?:${NUMBER_WORDS}))\\b\\s*([:.\\-–—]\\s*.*)?$`, "i"),
   /^#{1,2}\s+\S.*$/, // markdown H1/H2
 ];
 
@@ -44,10 +44,15 @@ export function normalizeManuscript(raw: string): string {
     .trim();
 }
 
+// "Chapter 3 Ashes" — number followed directly by a capitalised title (checked case-sensitively below).
+const CHAPTER_WITH_BARE_TITLE = /^(chapter|ch\.)\s+(\d+|[ivxlc]{1,7})\s+(\S.*)$/i;
+
 function isHeading(line: string): boolean {
   const t = line.trim();
   if (!t || t.length > 120) return false;
-  return HEADING_PATTERNS.some((re) => re.test(t));
+  if (HEADING_PATTERNS.some((re) => re.test(t))) return true;
+  const m = t.match(CHAPTER_WITH_BARE_TITLE);
+  return !!m && /^\p{Lu}/u.test(m[3]) && t.length <= 80 && !/[.!?,;]$/.test(t);
 }
 
 function cleanTitle(line: string): string {
@@ -102,7 +107,13 @@ export function splitIntoChapters(raw: string): SplitChapter[] {
 }
 
 export function splitBySize(text: string, target = FALLBACK_SECTION_WORDS): SplitChapter[] {
-  const paragraphs = text.split(/\n\s*\n/);
+  // Text with single line breaks between paragraphs has no blank lines; fall back to
+  // single newlines (and finally sentences) so no "paragraph" is bigger than a section.
+  const paragraphs = text.split(/\n\s*\n/).flatMap((p) => {
+    if (countWords(p) <= target) return [p];
+    const lines = p.split("\n");
+    return lines.flatMap((l) => (countWords(l) <= target ? [l] : l.split(/(?<=[.!?…]["”’']?)\s+/)));
+  });
   const out: SplitChapter[] = [];
   let buf: string[] = [];
   let words = 0;

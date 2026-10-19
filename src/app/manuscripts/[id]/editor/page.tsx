@@ -12,11 +12,13 @@ export default async function EditorPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ c?: string; chapter?: string; q?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireUser();
   const { id } = await params;
-  const sp = await searchParams;
+  const raw = await searchParams;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const sp = { c: one(raw.c), chapter: one(raw.chapter), q: one(raw.q) };
 
   const ms = await db.manuscript.findFirst({
     where: { id, userId: user.id },
@@ -33,7 +35,14 @@ export default async function EditorPage({
   });
   if (!ms) notFound();
 
-  const current = sp.c ? ms.conversations.find((c) => c.id === sp.c) : undefined;
+  const current = sp.c
+    ? (ms.conversations.find((c) => c.id === sp.c) ??
+      (await db.conversation.findFirst({
+        where: { id: sp.c, manuscriptId: ms.id },
+        select: { id: true, title: true, chapterId: true, updatedAt: true },
+      })) ??
+      undefined)
+    : undefined;
   const messages = current
     ? await db.message.findMany({ where: { conversationId: current.id }, orderBy: { createdAt: "asc" }, select: { id: true, role: true, content: true } })
     : [];

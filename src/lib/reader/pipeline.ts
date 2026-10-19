@@ -18,10 +18,25 @@ const KIND: Record<"reaction" | "praise" | "issue", NoteKind> = {
  */
 export async function claimManuscript(manuscriptId: string, userId: string): Promise<boolean> {
   const { count } = await db.manuscript.updateMany({
-    where: { id: manuscriptId, userId, status: { notIn: ["QUEUED", "READING"] } },
+    where: {
+      id: manuscriptId,
+      userId,
+      OR: [
+        { status: { notIn: ["QUEUED", "READING"] } },
+        // A read whose process died (restart, serverless timeout) can be reclaimed.
+        { updatedAt: { lt: new Date(Date.now() - STALE_READ_MS) } },
+      ],
+    },
     data: { status: "QUEUED", error: null },
   });
   return count === 1;
+}
+
+/** A read that hasn't made progress in this long is considered dead. Each chapter touches updatedAt. */
+export const STALE_READ_MS = 15 * 60 * 1000;
+
+export function isStale(status: string, updatedAt: Date) {
+  return (status === "QUEUED" || status === "READING") && Date.now() - updatedAt.getTime() > STALE_READ_MS;
 }
 
 /**
@@ -35,7 +50,7 @@ export async function claimManuscript(manuscriptId: string, userId: string): Pro
 export async function readManuscript(manuscriptId: string) {
   const ms = await db.manuscript.findUnique({
     where: { id: manuscriptId },
-    include: { chapters: { orderBy: { index: "asc" }, include: { review: true } } },
+    include: { chapters: { orderBy: { index: "asc" }, select: { id: true } } },
   });
   if (!ms) return;
 
@@ -54,11 +69,16 @@ export async function readManuscript(manuscriptId: string) {
 
   try {
     let memory: string | null = null;
-    for (const chapter of ms.chapters) {
+    for (const { id } of ms.chapters) {
+      // Re-fetch each chapter so the read always uses its latest text and review state.
+      const chapter = await db.chapter.findUnique({ where: { id }, include: { review: true } });
+      if (!chapter) throw new Error("A chapter was removed during the read.");
       if (chapter.review?.status === "DONE") {
         memory = chapter.review.memory;
         continue;
       }
+      // Heartbeat so a dead read can be detected and resumed (see claimManuscript).
+      await db.manuscript.update({ where: { id: ms.id }, data: { updatedAt: new Date() } });
       memory = await readChapter({ system, chapter, total: ms.chapters.length, memory });
     }
     await writeBookReport(ms.id, ctx);
@@ -69,7 +89,8 @@ export async function readManuscript(manuscriptId: string) {
     ]);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await db.manuscript.update({ where: { id: ms.id }, data: { status: "ERROR", error: message } });
+    // updateMany: the manuscript may have been deleted mid-read.
+    await db.manuscript.updateMany({ where: { id: ms.id }, data: { status: "ERROR", error: message } });
   }
 }
 
@@ -175,7 +196,7 @@ async function readChapter(args: {
     return data.memory;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await db.chapterReview.update({ where: { id: review.id }, data: { status: "ERROR", error: message } });
+    await db.chapterReview.updateMany({ where: { id: review.id }, data: { status: "ERROR", error: message } });
     throw new Error(`Reading stopped at "${chapter.title}": ${message}`);
   }
 }

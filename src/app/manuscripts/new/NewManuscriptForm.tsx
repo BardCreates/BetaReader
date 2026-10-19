@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { createManuscript, type FormState } from "@/app/actions";
 import { buttonClass, Card, inputClass } from "@/components/ui";
 
@@ -10,7 +10,16 @@ export function NewManuscriptForm({ personas }: { personas: { id: string; label:
   const [persona, setPersona] = useState(personas[0]?.id ?? "enthusiast");
 
   return (
-    <form action={action} className="mt-8 space-y-6">
+    <form
+      // Submit via onSubmit (not the `action` prop) so React doesn't reset the form when the
+      // server returns an error — authors shouldn't lose a pasted manuscript to a typo.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => action(data));
+      }}
+      className="mt-8 space-y-6"
+    >
       <Card className="space-y-4">
         <Field label="Title">
           <input name="title" required className={inputClass} placeholder="The Orchard at Night" />

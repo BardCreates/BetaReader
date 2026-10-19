@@ -70,7 +70,12 @@ export function ChapterReader(props: {
     <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
       <Card className="px-6 py-8 sm:px-10">
         <div className="mb-6 flex justify-end">
-          <button className={ghostButtonClass} onClick={() => setEditing(true)} disabled={props.busy}>
+          <button
+            className={ghostButtonClass}
+            onClick={() => setEditing(true)}
+            disabled={props.busy}
+            title={props.busy ? "Available once the reader finishes" : undefined}
+          >
             Revise this chapter
           </button>
         </div>
@@ -229,10 +234,11 @@ function ReviseForm({ chapterId, initial, onCancel, onDone }: { chapterId: strin
           onClick={() =>
             start(async () => {
               try {
-                await reviseChapter(chapterId, text);
-                onDone();
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "Couldn't save the revision.");
+                const result = await reviseChapter(chapterId, text);
+                if (result?.error) setError(result.error);
+                else onDone();
+              } catch {
+                setError("Couldn't save the revision. Please try again.");
               }
             })
           }

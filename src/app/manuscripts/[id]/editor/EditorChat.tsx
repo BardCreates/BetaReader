@@ -61,7 +61,9 @@ export function EditorChat(props: {
       }
       if (newId && newId !== conversationId) {
         setConversationId(newId);
-        // Put the conversation in the URL and refresh the sidebar without remounting the chat.
+        // Put the new conversation in the URL and refresh the sidebar. The page then re-renders with
+        // ?c=<id>, remounting this component with the saved messages (the reply is persisted before
+        // the stream closes), so nothing is lost.
         window.history.replaceState(null, "", `/manuscripts/${props.manuscriptId}/editor?c=${newId}`);
         router.refresh();
       }

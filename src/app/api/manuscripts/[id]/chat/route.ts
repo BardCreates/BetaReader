@@ -1,3 +1,4 @@
+import { APIUserAbortError } from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { currentUserId } from "@/auth";
 import { db } from "@/lib/db";
@@ -37,11 +38,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
   }
 
-  const history = await db.message.findMany({
-    where: { conversationId: conversation.id },
-    orderBy: { createdAt: "asc" },
-    take: 40,
-  });
+  // Most recent 40 messages, oldest first, starting on a user turn.
+  const history = (
+    await db.message.findMany({
+      where: { conversationId: conversation.id },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+    })
+  ).reverse();
+  while (history[0]?.role === "assistant") history.shift();
   await db.message.create({ data: { conversationId: conversation.id, role: "user", content: message } });
 
   const system = await buildEditorSystem(manuscriptId, conversation.chapterId);
@@ -61,23 +66,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       let full = "";
+      let clientGone = false;
+      const send = (text: string) => {
+        if (clientGone) return;
+        try {
+          controller.enqueue(encoder.encode(text));
+        } catch {
+          clientGone = true; // the browser disconnected; keep collecting so the reply is saved
+        }
+      };
       try {
         for await (const event of stream) {
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             full += event.delta.text;
-            controller.enqueue(encoder.encode(event.delta.text));
+            send(event.delta.text);
           }
         }
       } catch (err) {
-        const note = `\n\n_(The editor was interrupted: ${err instanceof Error ? err.message : "unknown error"})_`;
-        full += note;
-        controller.enqueue(encoder.encode(note));
+        if (!(err instanceof APIUserAbortError)) {
+          const note = `\n\n_(The editor was interrupted: ${err instanceof Error ? err.message : "unknown error"})_`;
+          full += note;
+          send(note);
+        }
       } finally {
         if (full) {
           await db.message.create({ data: { conversationId, role: "assistant", content: full } });
           await db.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
         }
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // already closed by the client
+        }
       }
     },
     cancel() {

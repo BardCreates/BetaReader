@@ -58,9 +58,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 /** Use in server components, actions and route handlers that need a signed-in user. */
 export async function requireUser() {
   const session = await auth();
-  const id = session?.user?.id;
-  if (!id) redirect("/signin");
-  return { id, email: session.user?.email ?? null, name: session.user?.name ?? null };
+  if (!session?.user?.id) redirect("/signin");
+  return { id: session.user.id, email: session.user.email ?? null, name: session.user.name ?? null };
 }
 
 /** Route-handler variant: returns null instead of redirecting. */

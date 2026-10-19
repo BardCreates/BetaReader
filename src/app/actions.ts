@@ -90,22 +90,33 @@ export async function startReading(manuscriptId: string, fresh = false) {
   revalidatePath(`/manuscripts/${manuscriptId}`);
 }
 
-async function ownedChapter(chapterId: string, userId: string) {
-  const chapter = await db.chapter.findFirst({
-    where: { id: chapterId, manuscript: { userId } },
-    include: { manuscript: { select: { id: true } } },
-  });
-  if (!chapter) throw new Error("Chapter not found.");
-  return chapter;
-}
+// Server actions can be called with any arguments, so validate them at runtime.
+const ReviseInput = z.object({ chapterId: z.string().min(1), content: z.string().max(400_000) });
 
-export async function reviseChapter(chapterId: string, content: string) {
+export async function reviseChapter(chapterId: string, content: string): Promise<FormState> {
   const user = await requireUser();
-  const chapter = await ownedChapter(chapterId, user.id);
-  const text = content.replace(/\r\n?/g, "\n").trim();
-  if (countWords(text) < 20) throw new Error("The revised chapter is too short.");
+  const input = ReviseInput.safeParse({ chapterId, content });
+  if (!input.success) return { error: "That revision couldn't be saved." };
+
+  const chapter = await db.chapter.findFirst({
+    where: { id: input.data.chapterId, manuscript: { userId: user.id } },
+    include: { review: { select: { status: true } }, manuscript: { select: { id: true, status: true } } },
+  });
+  if (!chapter) return { error: "Chapter not found." };
+  if (["QUEUED", "READING"].includes(chapter.manuscript.status) || ["QUEUED", "READING"].includes(chapter.review?.status ?? "")) {
+    return { error: "The reader is still working. Revise once the current read finishes." };
+  }
+
+  const text = input.data.content.replace(/\r\n?/g, "\n").trim();
+  const words = countWords(text);
+  if (words < 20) return { error: "The revised chapter is too short." };
+
   await db.$transaction([
-    db.chapter.update({ where: { id: chapter.id }, data: { content: text, wordCount: countWords(text) } }),
+    db.chapter.update({ where: { id: chapter.id }, data: { content: text, wordCount: words } }),
+    db.manuscript.update({
+      where: { id: chapter.manuscript.id },
+      data: { wordCount: { increment: words - chapter.wordCount } },
+    }),
     db.chapterReview.upsert({
       where: { chapterId: chapter.id },
       update: { status: "QUEUED", error: null },
@@ -114,10 +125,16 @@ export async function reviseChapter(chapterId: string, content: string) {
   ]);
   after(() => rereadChapter(chapter.id));
   revalidatePath(`/manuscripts/${chapter.manuscript.id}/chapters/${chapter.index + 1}`);
+  return undefined;
 }
 
-export async function setNoteStatus(noteId: string, status: "OPEN" | "RESOLVED" | "DISMISSED") {
+const NoteStatus = z.enum(["OPEN", "RESOLVED", "DISMISSED"]);
+
+export async function setNoteStatus(noteId: string, rawStatus: "OPEN" | "RESOLVED" | "DISMISSED") {
   const user = await requireUser();
+  const parsedStatus = NoteStatus.safeParse(rawStatus);
+  if (!parsedStatus.success || typeof noteId !== "string") return;
+  const status = parsedStatus.data;
   const note = await db.note.findFirst({
     where: { id: noteId, review: { chapter: { manuscript: { userId: user.id } } } },
     include: { review: { include: { chapter: true } } },

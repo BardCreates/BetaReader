@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { Card, ghostButtonClass, StatusBadge } from "@/components/ui";
 import { db } from "@/lib/db";
+import { isStale } from "@/lib/reader/pipeline";
 import { ChapterReader } from "./ChapterReader";
 
 export default async function ChapterPage({ params }: { params: Promise<{ id: string; n: string }> }) {
@@ -15,7 +16,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ id: st
 
   const ms = await db.manuscript.findFirst({
     where: { id, userId: user.id },
-    select: { id: true, title: true, status: true, _count: { select: { chapters: true } } },
+    select: { id: true, title: true, status: true, updatedAt: true, _count: { select: { chapters: true } } },
   });
   if (!ms) notFound();
   const chapter = await db.chapter.findUnique({
@@ -25,13 +26,16 @@ export default async function ChapterPage({ params }: { params: Promise<{ id: st
   if (!chapter) notFound();
 
   const review = chapter.review;
-  const busy = review?.status === "QUEUED" || review?.status === "READING";
+  const reviewBusy =
+    review != null && (review.status === "QUEUED" || review.status === "READING") && !isStale(review.status, review.updatedAt);
+  const manuscriptBusy = (ms.status === "QUEUED" || ms.status === "READING") && !isStale(ms.status, ms.updatedAt);
+  const busy = reviewBusy || manuscriptBusy;
   const base = `/manuscripts/${ms.id}`;
   const total = ms._count.chapters;
 
   return (
     <>
-      <AutoRefresh active={busy || ms.status === "READING"} />
+      <AutoRefresh active={busy} />
       <AppHeader
         email={user.email}
         crumbs={[

@@ -8,6 +8,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { buttonClass, Card, EngagementStrip, ghostButtonClass, StatusBadge } from "@/components/ui";
 import { db } from "@/lib/db";
 import { personaFor } from "@/lib/reader/personas";
+import { isStale } from "@/lib/reader/pipeline";
 import type { BookReportContent } from "@/lib/reader/schemas";
 
 export default async function ManuscriptPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,7 +40,8 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
   });
   if (!ms) notFound();
 
-  const busy = ms.status === "QUEUED" || ms.status === "READING";
+  const stale = isStale(ms.status, ms.updatedAt);
+  const busy = (ms.status === "QUEUED" || ms.status === "READING") && !stale;
   const doneCount = ms.chapters.filter((c) => c.review?.status === "DONE").length;
   const report = ms.report?.status === "DONE" ? (ms.report.content as BookReportContent) : null;
   const base = `/manuscripts/${ms.id}`;
@@ -65,7 +67,7 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
             {!busy && (
               <form action={startReading.bind(null, ms.id, ms.status === "DONE")}>
                 <SubmitButton className={buttonClass} pendingLabel="Starting…" confirm={ms.status === "DONE" ? "Start a fresh read? This replaces the current notes and report." : undefined}>
-                  {ms.status === "DRAFT" ? "Start reading" : ms.status === "ERROR" ? "Resume reading" : "Read again"}
+                  {ms.status === "DRAFT" ? "Start reading" : ms.status === "DONE" ? "Read again" : "Resume reading"}
                 </SubmitButton>
               </form>
             )}
@@ -84,6 +86,11 @@ export default async function ManuscriptPage({ params }: { params: Promise<{ id:
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line">
               <div className="h-full rounded-full bg-reaction transition-all" style={{ width: `${(doneCount / ms.chapters.length) * 100}%` }} />
             </div>
+          </Card>
+        )}
+        {stale && (
+          <Card className="mt-6 border-accent/40 bg-accent-soft/50 text-sm text-accent">
+            The read stopped making progress (the server may have restarted). Resume to pick up where it left off.
           </Card>
         )}
         {ms.status === "ERROR" && ms.error && (
@@ -176,7 +183,7 @@ function ReportView({ report, base }: { report: BookReportContent; base: string 
               {p.chapters.length > 0 && (
                 <p className="mt-3 flex flex-wrap gap-1.5 text-xs text-muted">
                   Most visible in:
-                  {p.chapters.map((n) => (
+                  {[...new Set(p.chapters)].map((n) => (
                     <Link key={n} href={`${base}/chapters/${n}`} className="underline hover:text-ink">
                       ch. {n}
                     </Link>

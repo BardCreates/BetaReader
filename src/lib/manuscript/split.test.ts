@@ -50,6 +50,23 @@ test("falls back to size-based sections with no headings", () => {
   assert.equal(ch.reduce((s, c) => s + c.wordCount, 0), 15000);
 });
 
+test("recognises 'Chapter 3 Ashes' headings without punctuation", () => {
+  const ch = splitIntoChapters("Chapter 1 The Arrival\n\nA.\n\nChapter 2 Smoke\n\nB.");
+  assert.deepEqual(ch.map((c) => c.title), ["Chapter 1 The Arrival", "Chapter 2 Smoke"]);
+});
+
+test("does not treat 'Chapter mix' or a sentence as a heading", () => {
+  const ch = splitIntoChapters(`Chapter mix\n\n${para(50)}\n\nChapter 1 was the hardest to write.\n\nMore.`);
+  assert.equal(ch.length, 1);
+});
+
+test("splits single-newline text with no headings into sections", () => {
+  const text = Array.from({ length: 40 }, () => para(300)).join("\n");
+  const ch = splitIntoChapters(text);
+  assert.ok(ch.length >= 2, `expected several sections, got ${ch.length}`);
+  for (const c of ch) assert.ok(c.wordCount <= FALLBACK_SECTION_WORDS + 300);
+});
+
 test("normalises Windows line endings", () => {
   const ch = splitIntoChapters("Chapter 1\r\n\r\nHello.\r\n\r\nChapter 2\r\n\r\nBye.");
   assert.equal(ch.length, 2);
