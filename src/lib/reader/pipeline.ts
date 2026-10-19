@@ -2,7 +2,7 @@ import "server-only";
 import type { NoteKind, Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { findQuote } from "@/lib/manuscript/anchor";
-import { MODEL, callTool } from "./anthropic";
+import { MODEL, callStructured } from "./anthropic";
 import { bookReportUserPrompt, chapterUserPrompt, readerSystemPrompt, type ManuscriptContext } from "./prompts";
 import { BookReportSchema, ChapterFeedbackSchema, bookReportTool, chapterFeedbackTool } from "./schemas";
 
@@ -145,12 +145,13 @@ async function readChapter(args: {
   });
 
   try {
-    const { data, usage } = await callTool({
+    const { data, usage } = await callStructured({
       system: args.system,
       user: chapterUserPrompt({ index: chapter.index, total: args.total, title: chapter.title, content: chapter.content, memory: args.memory }),
-      tool: chapterFeedbackTool,
+      schema: chapterFeedbackTool.input_schema,
       // Roughly: notes + reaction + memory. Long chapters get more room.
-      maxTokens: Math.min(16_000, 6_000 + Math.round(chapter.wordCount / 2)),
+      // Headroom for the model's reasoning plus notes, reaction and memory.
+      maxTokens: Math.min(32_000, 16_000 + Math.round(chapter.wordCount / 2)),
       parse: (input) => ChapterFeedbackSchema.parse(input),
     });
 
@@ -215,7 +216,7 @@ async function writeBookReport(manuscriptId: string, ctx: ManuscriptContext) {
   });
 
   try {
-    const { data, usage } = await callTool({
+    const { data, usage } = await callStructured({
       system: [{ type: "text", text: readerSystemPrompt(ctx) }],
       user: bookReportUserPrompt({
         chapters: chapters.map((c) => ({
@@ -230,8 +231,8 @@ async function writeBookReport(manuscriptId: string, ctx: ManuscriptContext) {
         })),
         finalMemory: chapters.at(-1)?.review?.memory ?? null,
       }),
-      tool: bookReportTool,
-      maxTokens: 16_000,
+      schema: bookReportTool.input_schema,
+      maxTokens: 32_000,
       parse: (input) => BookReportSchema.parse(input),
     });
     await db.bookReport.update({

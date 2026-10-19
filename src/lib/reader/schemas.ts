@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+// Structured outputs may change the capitalisation of enum values, so match case-insensitively.
+const ciEnum = <const T extends readonly [string, ...string[]]>(values: T) =>
+  z.preprocess((v) => (typeof v === "string" ? v.toLowerCase() : v), z.enum(values));
+
+// Range limits can't be enforced by structured outputs, so round and clamp instead of failing a whole read.
+const score = (min: number, max: number) =>
+  z.preprocess((v) => (typeof v === "number" ? Math.min(max, Math.max(min, Math.round(v))) : v), z.number().int());
+
 export const NOTE_CATEGORIES = [
   "pacing",
   "tension",
@@ -17,18 +25,18 @@ export const NOTE_CATEGORIES = [
 // ─── Chapter read ────────────────────────────────────────────────
 
 export const ChapterNoteSchema = z.object({
-  kind: z.enum(["reaction", "praise", "issue"]),
-  category: z.enum(NOTE_CATEGORIES),
-  severity: z.number().int().min(1).max(3).default(2),
+  kind: ciEnum(["reaction", "praise", "issue"]),
+  category: ciEnum(NOTE_CATEGORIES),
+  severity: score(1, 3).default(2),
   quote: z.string().min(3),
   comment: z.string().min(1),
-  suggestion: z.string().optional().nullable(),
+  suggestion: z.string().nullish(),
 });
 
 export const ChapterFeedbackSchema = z.object({
   reaction: z.string().min(1),
   summary: z.string().min(1),
-  engagement: z.number().int().min(1).max(10),
+  engagement: score(1, 10),
   strengths: z.array(z.string()).default([]),
   notes: z.array(ChapterNoteSchema).default([]),
   questions: z.array(z.string()).default([]),
@@ -117,13 +125,13 @@ export const BookReportSchema = z.object({
         detail: z.string(),
         chapters: z.array(z.number().int()).default([]),
         fix: z.string(),
-        priority: z.number().int().min(1).max(3).default(2),
+        priority: score(1, 3).default(2),
       }),
     )
     .default([]),
   characters: z.array(z.object({ name: z.string(), assessment: z.string() })).default([]),
   threads: z
-    .array(z.object({ thread: z.string(), status: z.enum(["resolved", "unresolved", "dropped"]), note: z.string() }))
+    .array(z.object({ thread: z.string(), status: ciEnum(["resolved", "unresolved", "dropped"]), note: z.string() }))
     .default([]),
   pacing: z.string(),
   revisionPlan: z.array(z.string()).default([]),

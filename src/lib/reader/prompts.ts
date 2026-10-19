@@ -62,7 +62,7 @@ Now read chapter ${args.index + 1} of ${args.total}: "${args.title}".${ending}
 ${args.content}
 </chapter>
 
-Read it, then call submit_chapter_read with your reaction, inline notes quoting exact passages, and your updated reader memory.`;
+Read it, then respond with your reaction, inline notes quoting exact passages, and your updated reader memory, in the required JSON format.`;
 }
 
 export function bookReportUserPrompt(args: {
@@ -99,7 +99,7 @@ ${args.finalMemory ?? ""}
 
 Step back and assess the book as a whole, like a developmental editor writing to the author after a full read.
 Look for patterns across chapters, not just repeats of individual notes. Note which questions you were carrying were answered and which were left hanging.
-Call submit_book_report.`;
+Respond with your assessment in the required JSON format.`;
 }
 
 export function editorSystemPrompt(ctx: ManuscriptContext, context: string) {
