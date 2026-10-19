@@ -11,9 +11,14 @@ export default async function Home() {
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col px-6">
       <nav className="flex items-center justify-between py-6">
         <span className="font-serif text-xl font-semibold">Beta Reader</span>
-        <Link href="/signin" className="text-sm text-muted hover:text-ink">
-          Sign in
-        </Link>
+        <div className="flex items-center gap-5 text-sm">
+          <Link href="/pricing" className="text-muted hover:text-ink">
+            Pricing
+          </Link>
+          <Link href="/signin" className="text-muted hover:text-ink">
+            Sign in
+          </Link>
+        </div>
       </nav>
 
       <section className="grid flex-1 items-center gap-12 py-12 md:grid-cols-2">

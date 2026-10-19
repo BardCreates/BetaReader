@@ -1,6 +1,6 @@
 import type { ReadingStatus } from "@/generated/prisma/client";
 
-export function StatusBadge({ status }: { status: ReadingStatus }) {
+export function StatusBadge({ status, paused = false }: { status: ReadingStatus; paused?: boolean }) {
   const map: Record<ReadingStatus, [string, string]> = {
     DRAFT: ["Not read yet", "bg-line text-muted"],
     QUEUED: ["Starting…", "bg-reaction-soft text-reaction"],
@@ -8,7 +8,7 @@ export function StatusBadge({ status }: { status: ReadingStatus }) {
     DONE: ["Read", "bg-praise-soft text-praise"],
     ERROR: ["Stopped", "bg-danger-soft text-danger"],
   };
-  const [label, cls] = map[status];
+  const [label, cls] = paused ? ["Paused", "bg-issue-soft text-issue"] : map[status];
   return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
 }
 

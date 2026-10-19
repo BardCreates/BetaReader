@@ -13,9 +13,16 @@ import type { PitchKitContent } from "@/lib/reader/schemas";
 
 export const metadata = { title: "Pitch kit" };
 
-export default async function PitchKitPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PitchKitPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireUser();
   const { id } = await params;
+  const limit = (await searchParams).limit;
   const ms = await db.manuscript.findFirst({
     where: { id, userId: user.id },
     select: {
@@ -59,6 +66,14 @@ export default async function PitchKitPage({ params }: { params: Promise<{ id: s
           )}
         </div>
 
+        {typeof limit === "string" && !writing && (
+          <p className="mt-6 rounded-lg bg-issue-soft px-4 py-2.5 text-sm text-issue" data-testid="limit-card">
+            {limit}{" "}
+            <Link href="/pricing" className="font-medium underline">
+              See plans
+            </Link>
+          </p>
+        )}
         {!readDone && (
           <Card className="mt-8 text-sm text-muted">
             The pitch kit is written from a full read of the book. <Link href={base} className="text-accent underline">Finish a read</Link> first,

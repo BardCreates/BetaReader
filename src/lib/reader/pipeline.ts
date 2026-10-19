@@ -1,5 +1,6 @@
 import "server-only";
 import { Prisma, type NoteKind } from "@/generated/prisma/client";
+import { isLimitError, release, reserve, type Meter, type Reservation } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { MODEL, callStructured } from "./anthropic";
@@ -12,10 +13,6 @@ const KIND: Record<"reaction" | "praise" | "issue", NoteKind> = {
   issue: "ISSUE",
 };
 
-/**
- * Claim a manuscript for reading. Returns false if a read is already running,
- * so double-clicks and concurrent requests don't start two readers.
- */
 /** Chapters shorter than this are skipped (e.g. a new chapter the author hasn't written yet). */
 export const MIN_WORDS_TO_READ = 20;
 
@@ -25,7 +22,21 @@ export function isReviewStale(review: { status: string; readAt: Date | null; upd
   return contentUpdatedAt.getTime() > (review.readAt ?? review.updatedAt).getTime();
 }
 
-export async function claimManuscript(manuscriptId: string, userId: string): Promise<boolean> {
+/**
+ * Claim a manuscript for reading, so double-clicks and concurrent requests don't start two
+ * readers. One read at a time per user: "otherBusy" if another of their books is being read.
+ */
+export async function claimManuscript(manuscriptId: string, userId: string): Promise<"claimed" | "busy" | "otherBusy"> {
+  const other = await db.manuscript.findFirst({
+    where: {
+      userId,
+      id: { not: manuscriptId },
+      status: { in: ["QUEUED", "READING"] },
+      updatedAt: { gte: new Date(Date.now() - STALE_READ_MS) },
+    },
+    select: { id: true },
+  });
+  if (other) return "otherBusy";
   const { count } = await db.manuscript.updateMany({
     where: {
       id: manuscriptId,
@@ -36,9 +47,9 @@ export async function claimManuscript(manuscriptId: string, userId: string): Pro
         { updatedAt: { lt: new Date(Date.now() - STALE_READ_MS) } },
       ],
     },
-    data: { status: "QUEUED", error: null },
+    data: { status: "QUEUED", error: null, errorCode: null },
   });
-  return count === 1;
+  return count === 1 ? "claimed" : "busy";
 }
 
 /** A read that hasn't made progress in this long is considered dead. Each chapter touches updatedAt. */
@@ -77,9 +88,10 @@ export async function readManuscript(manuscriptId: string, opts: { rereadChanged
   // The system prompt is identical for every chapter, so cache it.
   const system = [{ type: "text" as const, text: readerSystemPrompt(ctx), cache_control: { type: "ephemeral" as const } }];
 
+  const meter = { userId: ms.userId, manuscriptId: ms.id };
+  let reservation: Reservation | null = null;
   try {
     let memory: string | null = null;
-    let wordsRead = 0;
     for (const { id } of ms.chapters) {
       // Re-fetch each chapter so the read always uses its latest text and review state.
       const chapter = await db.chapter.findUnique({ where: { id }, include: { review: true } });
@@ -90,21 +102,24 @@ export async function readManuscript(manuscriptId: string, opts: { rereadChanged
         continue;
       }
       if (chapter.wordCount < MIN_WORDS_TO_READ) continue; // nothing to read yet
+      // Take the chapter's words from the allowance first; stops the read cleanly at the limit.
+      reservation = await reserve(ms.userId, "words", chapter.wordCount);
       // Heartbeat so a dead read can be detected and resumed (see claimManuscript).
       await db.manuscript.update({ where: { id: ms.id }, data: { updatedAt: new Date() } });
-      memory = await readChapter({ system, chapter, total: ms.chapters.length, memory });
-      wordsRead += chapter.wordCount;
+      memory = await readChapter({ system, chapter, total: ms.chapters.length, memory, meter });
+      reservation = null;
+      await db.user.update({ where: { id: ms.userId }, data: { wordsReadTotal: { increment: chapter.wordCount } } });
     }
-    await writeBookReport(ms.id, ctx);
-    await db.$transaction([
-      db.manuscript.update({ where: { id: ms.id }, data: { status: "DONE" } }),
-      // Usage metering for future billing.
-      db.user.update({ where: { id: ms.userId }, data: { wordsReadTotal: { increment: wordsRead } } }),
-    ]);
+    await writeBookReport(ms.id, ctx, meter);
+    await db.manuscript.update({ where: { id: ms.id }, data: { status: "DONE" } });
   } catch (err) {
+    await release(reservation).catch(() => {});
     const message = err instanceof Error ? err.message : String(err);
     // updateMany: the manuscript may have been deleted mid-read.
-    await db.manuscript.updateMany({ where: { id: ms.id }, data: { status: "ERROR", error: message } });
+    await db.manuscript.updateMany({
+      where: { id: ms.id },
+      data: { status: "ERROR", error: message, errorCode: isLimitError(err) ? err.code : null },
+    });
   }
 }
 
@@ -112,7 +127,7 @@ export async function readManuscript(manuscriptId: string, opts: { rereadChanged
  * Re-read a single chapter after the author revises it, using the reader memory from
  * the chapter before it. The book report is left as-is (the author can re-run the full read).
  */
-export async function rereadChapter(chapterId: string) {
+export async function rereadChapter(chapterId: string, reservation: Reservation | null) {
   const chapter = await db.chapter.findUniqueOrThrow({
     where: { id: chapterId },
     include: { manuscript: { include: { _count: { select: { chapters: true } } } } },
@@ -139,9 +154,12 @@ export async function rereadChapter(chapterId: string) {
       chapter,
       total: ms._count.chapters,
       memory: previous?.review?.memory ?? null,
+      meter: { userId: ms.userId, manuscriptId: ms.id },
     });
+    await db.user.update({ where: { id: ms.userId }, data: { wordsReadTotal: { increment: chapter.wordCount } } });
   } catch {
-    // readChapter already recorded the error on the review.
+    // readChapter already recorded the error on the review; give the words back.
+    await release(reservation).catch(() => {});
   }
 }
 
@@ -167,6 +185,7 @@ async function readChapter(args: {
   chapter: ChapterToRead;
   total: number;
   memory: string | null;
+  meter: Meter;
 }): Promise<string> {
   const { chapter } = args;
   const readAt = new Date();
@@ -251,6 +270,7 @@ async function readChapter(args: {
       // Headroom for the model's reasoning plus notes, reaction and memory.
       maxTokens: Math.min(32_000, 16_000 + Math.round(chapter.wordCount / 2)),
       parse: (input) => ChapterFeedbackSchema.parse(input),
+      meter: { ...args.meter, kind: "read" },
     });
 
     // Anchor each note to the passage it quotes, in the chapter's text as it is *now*
@@ -361,11 +381,12 @@ async function readChapter(args: {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await db.chapterReview.updateMany({ where: { id: review.id }, data: { status: "ERROR", error: message } });
+    if (isLimitError(err)) throw err; // keep the type so the read stops as "limit reached"
     throw new Error(`Reading stopped at "${chapter.title}": ${message}`);
   }
 }
 
-async function writeBookReport(manuscriptId: string, ctx: ManuscriptContext) {
+async function writeBookReport(manuscriptId: string, ctx: ManuscriptContext, meter: Omit<Meter, "kind">) {
   const chapters = await db.chapter.findMany({
     where: { manuscriptId },
     orderBy: { index: "asc" },
@@ -404,6 +425,7 @@ async function writeBookReport(manuscriptId: string, ctx: ManuscriptContext) {
       schema: bookReportTool.input_schema,
       maxTokens: 32_000,
       parse: (input) => BookReportSchema.parse(input),
+      meter: { ...meter, kind: "report" },
     });
     await db.bookReport.update({
       where: { manuscriptId },
@@ -412,6 +434,7 @@ async function writeBookReport(manuscriptId: string, ctx: ManuscriptContext) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await db.bookReport.update({ where: { manuscriptId }, data: { status: "ERROR", error: message } });
+    if (isLimitError(err)) throw err;
     throw new Error(`Book report failed: ${message}`);
   }
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/auth";
+import { isLimitError } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
 import { FEATURES } from "@/lib/features";
 import { discoverCharacters } from "@/lib/reader/characters";
@@ -28,6 +29,7 @@ export async function findCharacters(manuscriptId: string): Promise<CharacterFor
     revalidatePath(`/manuscripts/${ms.id}/characters`);
     return { message: added ? `Found ${added} new character${added === 1 ? "" : "s"}.` : "No new characters found." };
   } catch (err) {
+    if (isLimitError(err)) return { error: err.message };
     console.error("character discovery failed", err);
     return { error: "Couldn't read the manuscript for characters. Please try again." };
   }

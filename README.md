@@ -80,11 +80,31 @@ src/lib/reader                  prompts, personas, schemas, pipeline, editor con
 src/lib/plans.ts                plan limits (free / author / pro)
 ```
 
+## Billing & cost control
+
+Plans live in `src/lib/plans.ts`: Free (10,000 words once), Author ($19/mo, $180/yr), Pro ($39/mo, $372/yr), plus a one-off $29 **book pass**. Customers only ever pay the plan price: there are no overage charges. Limits stop work instead.
+
+Three layers keep costs bounded (`src/lib/billing`):
+
+1. **Allowances, reserved before work starts.** Words read, grammar-check words, character chat messages and pitch kits are taken from the monthly allowance (then book-pass credit) inside a row-locked transaction *before* the AI is called, and given back if the work fails. A full read reserves chapter by chapter, so it pauses cleanly at the limit and resumes after an upgrade. Paid allowances reset monthly (yearly plans too); Free never resets. One read at a time per user.
+2. **Spend ceiling per user.** Every AI call is logged in `AiUsage` with its real cost from token counts (`cost.ts`). Once a user's spend for the period reaches their plan's `costCapUsd`, new AI work is refused, whatever the allowances say.
+3. **Daily budget for the whole app.** `AI_DAILY_BUDGET_USD` pauses new AI work for everyone once the day's spend reaches it. Also set a monthly spend limit on your API key's workspace in the Claude Console.
+
+### Setting up Stripe
+
+1. In the Stripe dashboard (start in **test mode**), create products and prices:
+   - Author: recurring $19/month and $180/year
+   - Pro: recurring $39/month and $372/year
+   - Book pass: one-time $29
+2. Copy each price id (`price_...`) and your secret key into `.env` (see `.env.example`).
+3. Add a webhook endpoint at `https://<your app>/api/stripe/webhook` for `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated` and `customer.subscription.deleted`, and put its signing secret in `STRIPE_WEBHOOK_SECRET`. Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+4. In Stripe's customer portal settings, allow switching between the four subscription prices and cancelling.
+
+Plans are matched to subscriptions by price id, so changing a price in Stripe only needs the env var updated.
+
 ## Roadmap to SaaS
 
 - **Durable background jobs.** Reading currently runs in-process via `after()`. That's fine locally and on a long-running Node server, but serverless platforms cap function duration. Move `readManuscript` to a job runner (Inngest, Trigger.dev, or a queue + worker) — it's already resumable chapter by chapter.
-- **Billing.** `User.plan`, `User.stripeCustomerId` and `User.wordsReadTotal` are in place, and limits are enforced on upload (`src/lib/plans.ts`). Next: Stripe Checkout + customer portal + webhook that sets `plan`.
-- **Cost controls.** Token usage is stored per chapter and report. Add per-plan monthly word quotas and show usage in the UI.
 - **More formats.** PDF and EPUB import; Scrivener via .docx export works today.
 - **Export.** Download the report and notes as .docx/PDF.
 - **Comparisons.** Show how engagement changed between reads after a revision.

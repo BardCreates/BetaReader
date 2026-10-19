@@ -1,15 +1,80 @@
 /**
- * Plan limits. Billing isn't wired yet; these are enforced on upload so the
- * Stripe integration only has to flip `User.plan`.
+ * Plans and what each one allows. Allowances are per month for paid plans (yearly plans
+ * too) and one-off for Free. A book pass adds credit on top that never expires.
+ *
+ * Words read are the main cost driver (about $2.50 per 120k-word novel on Sonnet), so
+ * they're the main allowance. `costCapUsd` is a backstop on real AI spend per period,
+ * in case any estimate is off.
  */
 export type PlanId = "free" | "author" | "pro";
 
-export const PLANS: Record<PlanId, { name: string; maxManuscripts: number; maxWordsPerManuscript: number }> = {
-  free: { name: "Free", maxManuscripts: 1, maxWordsPerManuscript: 30_000 },
-  author: { name: "Author", maxManuscripts: 5, maxWordsPerManuscript: 150_000 },
-  pro: { name: "Pro", maxManuscripts: 50, maxWordsPerManuscript: 250_000 },
+export type Allowance = {
+  /** Words the reader reads (full reads, re-reads, reading changes). */
+  words: number;
+  /** Words run through grammar & style. */
+  grammarWords: number;
+  /** Character chat messages. */
+  chat: number;
+  /** Pitch kits written (or rewritten). */
+  pitchKits: number;
+  /** Hard ceiling on AI spend, in dollars. */
+  costCapUsd: number;
 };
 
-export function planFor(plan: string | null | undefined) {
+export type Plan = {
+  id: PlanId;
+  name: string;
+  /** Display prices in dollars; the real prices live in Stripe. */
+  monthlyPrice: number;
+  yearlyPrice: number;
+  tagline: string;
+  maxManuscripts: number;
+  maxWordsPerManuscript: number;
+  allowance: Allowance;
+};
+
+export const PLANS: Record<PlanId, Plan> = {
+  free: {
+    id: "free",
+    name: "Free",
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    tagline: "Try the reader on your opening chapters.",
+    maxManuscripts: 1,
+    maxWordsPerManuscript: 250_000,
+    allowance: { words: 10_000, grammarWords: 10_000, chat: 20, pitchKits: 1, costCapUsd: 1 },
+  },
+  author: {
+    id: "author",
+    name: "Author",
+    monthlyPrice: 19,
+    yearlyPrice: 180,
+    tagline: "A full read every month, plus revisions.",
+    maxManuscripts: 10,
+    maxWordsPerManuscript: 250_000,
+    allowance: { words: 150_000, grammarWords: 300_000, chat: 200, pitchKits: 5, costCapUsd: 8 },
+  },
+  pro: {
+    id: "pro",
+    name: "Pro",
+    monthlyPrice: 39,
+    yearlyPrice: 372,
+    tagline: "For series, several books, and heavy revision.",
+    maxManuscripts: 50,
+    maxWordsPerManuscript: 400_000,
+    allowance: { words: 500_000, grammarWords: 1_000_000, chat: 1_000, pitchKits: 20, costCapUsd: 25 },
+  },
+};
+
+/** One-off purchase: enough for a full read of a novel, its pitch kit, and some revision. */
+export const BOOK_PASS = {
+  name: "Book pass",
+  price: 29,
+  credit: { words: 150_000, grammarWords: 150_000, chat: 50, pitchKits: 2, costCapUsd: 6 } satisfies Allowance,
+};
+
+export function planFor(plan: string | null | undefined): Plan {
   return PLANS[(plan as PlanId) in PLANS ? (plan as PlanId) : "free"];
 }
+
+export const isPaidPlan = (plan: string | null | undefined) => planFor(plan).id !== "free";

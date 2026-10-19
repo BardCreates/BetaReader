@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import type { Meter } from "@/lib/billing/usage";
 import { callStructured } from "./anthropic";
 
 /** Grammar & style uses a smaller, cheaper model than the reader. */
@@ -95,7 +96,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 }
 
 /** Check a chapter's text; returns suggestions in reading order (unanchored; the editor anchors them). */
-export async function lineEditText(text: string): Promise<{ suggestions: LineSuggestion[]; usage: { input: number; output: number } }> {
+export async function lineEditText(text: string, meter: Meter): Promise<{ suggestions: LineSuggestion[]; usage: { input: number; output: number } }> {
   const chunks = chunkText(text);
   const usage = { input: 0, output: 0 };
   const results = await mapLimit(chunks, 4, async (chunk) => {
@@ -106,6 +107,7 @@ export async function lineEditText(text: string): Promise<{ suggestions: LineSug
       schema,
       maxTokens: 8000,
       parse: (input) => SuggestionSchema.parse(input),
+      meter,
     });
     usage.input += u.input;
     usage.output += u.output;

@@ -1,5 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { fromApiUsage } from "@/lib/billing/cost";
+import { assertCanSpend, recordAiUsage, type Meter } from "@/lib/billing/usage";
 import { toStructuredSchema } from "./structured";
 
 export const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
@@ -23,7 +25,11 @@ export async function callStructured<T>(opts: {
   schema: unknown;
   maxTokens: number;
   parse: (input: unknown) => T;
+  /** Who to bill: checked against their spend ceiling first, and every attempt's cost is recorded. */
+  meter: Meter;
 }): Promise<{ data: T; usage: { input: number; output: number } }> {
+  await assertCanSpend(opts.meter.userId);
+  const model = opts.model ?? MODEL;
   const schema = toStructuredSchema(opts.schema);
   let maxTokens = opts.maxTokens;
   let lastError: unknown;
@@ -33,7 +39,7 @@ export async function callStructured<T>(opts: {
     // Streamed so long reads don't hit the SDK's non-streaming time limit.
     const res = await anthropic()
       .messages.stream({
-        model: opts.model ?? MODEL,
+        model,
         max_tokens: maxTokens,
         system: opts.system,
         output_config: { format: { type: "json_schema", schema } },
@@ -42,6 +48,7 @@ export async function callStructured<T>(opts: {
       .finalMessage();
     usage.input += res.usage.input_tokens;
     usage.output += res.usage.output_tokens;
+    await recordAiUsage(opts.meter, model, fromApiUsage(res.usage));
 
     if (res.stop_reason === "refusal") throw new Error("The model declined to read this passage.");
     if (res.stop_reason === "max_tokens") {

@@ -18,14 +18,35 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // SaaS groundwork: plan + usage metering (Stripe hooks up to these later)
-  plan             String  @default("free")
-  stripeCustomerId String? @unique
-  wordsReadTotal   Int     @default(0)
+  // ── Billing ── (see src/lib/billing)
+  plan                 String    @default("free") // free | author | pro
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  subscriptionStatus   String?   // Stripe status: active, trialing, past_due, canceled...
+  billingInterval      String?   // month | year
+  cancelAtPeriodEnd    Boolean   @default(false)
+  wordsReadTotal       Int       @default(0) // lifetime, for reporting
+
+  // Allowance period. Paid plans reset monthly (yearly plans too); free never resets (periodEnd null).
+  periodStart      DateTime @default(now())
+  periodEnd        DateTime?
+  wordsUsed        Int      @default(0) // words read by the reader this period
+  grammarWordsUsed Int      @default(0)
+  chatUsed         Int      @default(0) // character chat messages
+  pitchKitsUsed    Int      @default(0)
+  costMicros       Int      @default(0) // AI spend this period, in millionths of a dollar (backstop)
+
+  // Book passes: one-off credit that never expires, used after the monthly allowance.
+  passWords        Int @default(0)
+  passGrammarWords Int @default(0)
+  passChat         Int @default(0)
+  passPitchKits    Int @default(0)
+  passCostMicros   Int @default(0)
 
   accounts    Account[]
   sessions    Session[]
   manuscripts Manuscript[]
+  aiUsage     AiUsage[]
 }
 
 model Account {
@@ -87,6 +108,7 @@ model Manuscript {
   wordCount   Int           @default(0)
   status      ReadingStatus @default(DRAFT)
   error       String?       @db.Text
+  errorCode   String?       // "LIMIT" when a read paused because the plan's allowance ran out
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -321,4 +343,33 @@ model PitchKit {
   updatedAt    DateTime @updatedAt
 
   manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+}
+
+// ─── Billing & cost control ──────────────────────────────────────
+
+// Every AI call, with its real cost. Feeds the per-user spend ceiling and the app-wide daily budget.
+model AiUsage {
+  id               String   @id @default(cuid())
+  userId           String
+  manuscriptId     String?
+  kind             String   // read | report | grammar | chat | characters | pitch | editor
+  model            String
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  costMicros       Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+// Stripe webhook events already handled (webhooks can be delivered more than once).
+model StripeEvent {
+  id        String   @id // Stripe event id
+  type      String
+  createdAt DateTime @default(now())
 }

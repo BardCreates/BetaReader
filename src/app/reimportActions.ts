@@ -12,7 +12,9 @@ import { extractText } from "@/lib/manuscript/import";
 import { canonicalText, matchChapters, summarizeChanges, type ChapterChange } from "@/lib/manuscript/match";
 import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
 import { planFor } from "@/lib/plans";
-import { claimManuscript, readManuscript } from "@/lib/reader/pipeline";
+import { remaining } from "@/lib/billing/period";
+import { getUsage } from "@/lib/billing/usage";
+import { MIN_WORDS_TO_READ, claimManuscript, readManuscript } from "@/lib/reader/pipeline";
 
 export type ReimportPreview = {
   changes: ChapterChange[];
@@ -158,7 +160,11 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
  */
 export async function readChangedChapters(manuscriptId: string) {
   const user = await requireUser();
-  if (await claimManuscript(manuscriptId, user.id)) {
+  const base = `/manuscripts/${manuscriptId}`;
+  if (remaining(await getUsage(user.id), "words").total < MIN_WORDS_TO_READ) redirect(`${base}?notice=limit`);
+  const claim = await claimManuscript(manuscriptId, user.id);
+  if (claim === "otherBusy") redirect(`${base}?notice=busy`);
+  if (claim === "claimed") {
     after(() => readManuscript(manuscriptId, { rereadChanged: true }));
   }
   revalidatePath(`/manuscripts/${manuscriptId}`, "layout");

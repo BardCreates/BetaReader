@@ -52,6 +52,7 @@ export async function discoverCharacters(manuscriptId: string): Promise<{ added:
   const ms = await db.manuscript.findUniqueOrThrow({
     where: { id: manuscriptId },
     select: {
+      userId: true,
       title: true,
       genre: true,
       chapters: { orderBy: { index: "asc" }, select: { index: true, title: true, content: true } },
@@ -76,6 +77,7 @@ export async function discoverCharacters(manuscriptId: string): Promise<{ added:
     schema: foundJsonSchema,
     maxTokens: 8000,
     parse: (input) => FoundSchema.parse(input),
+    meter: { userId: ms.userId, manuscriptId, kind: "characters" },
   });
 
   const byName = new Map(ms.characters.map((c) => [c.name.toLowerCase(), c]));

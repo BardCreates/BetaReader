@@ -1,6 +1,8 @@
 import { APIUserAbortError } from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { currentUserId } from "@/auth";
+import { streamUsageTracker } from "@/lib/billing/streamUsage";
+import { isLimitError, recordAiUsage, release, reserve, type Reservation } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
 import { FEATURES } from "@/lib/features";
 import { MODEL, anthropic } from "@/lib/reader/anthropic";
@@ -31,6 +33,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   });
   if (!character) return new Response("Not found", { status: 404 });
 
+  // One message from the allowance; refused with the reason if it's used up.
+  let reservation: Reservation | null;
+  try {
+    reservation = await reserve(userId, "chat", 1);
+  } catch (err) {
+    if (isLimitError(err)) return new Response(err.message, { status: 429 });
+    throw err;
+  }
+
   let conversation = parsed.data.conversationId
     ? await db.conversation.findFirst({ where: { id: parsed.data.conversationId, characterId: character.id } })
     : null;
@@ -60,6 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     messages: [...history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })), { role: "user" as const, content: message }],
   });
 
+  const tracker = streamUsageTracker();
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -75,6 +87,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       };
       try {
         for await (const event of stream) {
+          tracker.onEvent(event);
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             full += event.delta.text;
             send(event.delta.text);
@@ -87,6 +100,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           send(note);
         }
       } finally {
+        // Bill what the reply actually used; if nothing came back, give the message back.
+        if (tracker.any) await recordAiUsage({ userId, manuscriptId, kind: "chat" }, MODEL, tracker.usage).catch((e) => console.error("usage", e));
+        if (!tracker.usage.output) await release(reservation).catch(() => {});
         if (full) {
           await db.message.create({ data: { conversationId, role: "assistant", content: full } });
           await db.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });

@@ -22,7 +22,9 @@ export default async function ManuscriptPage({
 }) {
   const user = await requireUser();
   const { id } = await params;
-  const justUpdated = (await searchParams).updated !== undefined;
+  const sp = await searchParams;
+  const justUpdated = sp.updated !== undefined;
+  const notice = typeof sp.notice === "string" ? sp.notice : null;
   const ms = await db.manuscript.findFirst({
     where: { id, userId: user.id },
     include: {
@@ -61,7 +63,7 @@ export default async function ManuscriptPage({
   const toRead = ms.chapters.filter(
     (c) => c.wordCount >= MIN_WORDS_TO_READ && (!c.review || c.review.status !== "DONE" || isReviewStale(c.review, c.contentUpdatedAt)),
   );
-  const showReadChanges = !busy && doneCount > 0 && toRead.length > 0 && ms.status !== "DRAFT";
+  const showReadChanges = !busy && doneCount > 0 && toRead.length > 0 && ms.status === "DONE";
 
   return (
     <>
@@ -71,7 +73,7 @@ export default async function ManuscriptPage({
           <div>
             <div className="flex items-center gap-3">
               <h1 className="font-serif text-3xl font-semibold">{ms.title}</h1>
-              <StatusBadge status={ms.status} />
+              <StatusBadge status={ms.status} paused={ms.status === "ERROR" && ms.errorCode === "LIMIT"} />
             </div>
             <p className="mt-1 text-muted">
               {[ms.genre, ms.audience, `${ms.wordCount.toLocaleString()} words`, `Read by: ${personaFor(ms.persona).label}`]
@@ -143,7 +145,22 @@ export default async function ManuscriptPage({
             The read stopped making progress (the server may have restarted). Resume to pick up where it left off.
           </Card>
         )}
-        {ms.status === "ERROR" && ms.error && (
+        {notice === "busy" && !busy && (
+          <Card className="mt-6 border-issue/40 bg-issue-soft/60 text-sm text-issue">
+            Another of your books is being read right now. The reader works on one book at a time; start this one when that read finishes.
+          </Card>
+        )}
+        {(notice === "limit" || (ms.status === "ERROR" && ms.errorCode === "LIMIT")) && !busy && (
+          <LimitCard
+            message={
+              ms.status === "ERROR" && ms.errorCode === "LIMIT" && ms.error
+                ? `The reader paused at chapter ${Math.min(doneCount + 1, ms.chapters.length)}. ${ms.error}`
+                : "You don’t have any reading allowance left. Upgrade or buy a book pass to start this read."
+            }
+            resumeNote={ms.status === "ERROR" && ms.errorCode === "LIMIT"}
+          />
+        )}
+        {ms.status === "ERROR" && ms.error && ms.errorCode !== "LIMIT" && (
           <Card className="mt-6 border-danger/40 bg-danger-soft/60 text-sm text-danger">{ms.error}</Card>
         )}
 
@@ -180,6 +197,25 @@ export default async function ManuscriptPage({
         </div>
       </main>
     </>
+  );
+}
+
+function LimitCard({ message, resumeNote }: { message: string; resumeNote: boolean }) {
+  return (
+    <Card className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 border-issue/40 bg-issue-soft/50" data-testid="limit-card">
+      <p className="min-w-0 flex-1 text-sm">
+        {message}
+        {resumeNote && <span className="text-muted"> When you have more, choose Resume reading and it picks up where it stopped.</span>}
+      </p>
+      <div className="flex gap-2">
+        <Link href="/pricing" className={buttonClass}>
+          See plans
+        </Link>
+        <Link href="/account" className={ghostButtonClass}>
+          Your usage
+        </Link>
+      </div>
+    </Card>
   );
 }
 

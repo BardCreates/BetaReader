@@ -11,6 +11,8 @@ import { extractText } from "@/lib/manuscript/import";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { docToPlain, plainToDoc, sanitizeDoc } from "@/lib/manuscript/doc";
 import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
+import { getUsage, isLimitError, release, reserve, type Reservation } from "@/lib/billing/usage";
+import { remaining } from "@/lib/billing/period";
 import { planFor } from "@/lib/plans";
 import { PERSONAS } from "@/lib/reader/personas";
 import { lineEditText, type LineSuggestion } from "@/lib/reader/lineEdit";
@@ -80,7 +82,12 @@ export async function createManuscript(_prev: FormState, form: FormData): Promis
 
 export async function startReading(manuscriptId: string, fresh = false) {
   const user = await requireUser();
-  if (await claimManuscript(manuscriptId, user.id)) {
+  const base = `/manuscripts/${manuscriptId}`;
+  // Nothing left to read with: say so up front instead of starting a read that stops at once.
+  if (remaining(await getUsage(user.id), "words").total < MIN_WORDS_TO_READ) redirect(`${base}?notice=limit`);
+  const claim = await claimManuscript(manuscriptId, user.id);
+  if (claim === "otherBusy") redirect(`${base}?notice=busy`);
+  if (claim === "claimed") {
     if (fresh) {
       // Start over: a new read from chapter 1 with no memory of the previous read.
       await db.$transaction([
@@ -178,10 +185,14 @@ export async function checkGrammar(chapterId: string, rawDoc: unknown): Promise<
   }
   if (countWords(text) < 3) return { ok: true, suggestions: [] };
   if (text.length > MAX_CHAPTER_CHARS) return { ok: false, error: "This chapter is too long to check at once. Try splitting it." };
+  let reservation: Reservation | null = null;
   try {
-    const { suggestions } = await lineEditText(text);
+    reservation = await reserve(user.id, "grammarWords", countWords(text));
+    const { suggestions } = await lineEditText(text, { userId: user.id, manuscriptId: chapter.manuscript.id, kind: "grammar" });
     return { ok: true, suggestions };
   } catch (err) {
+    await release(reservation).catch(() => {});
+    if (isLimitError(err)) return { ok: false, error: err.message };
     console.error("grammar check failed", err);
     return { ok: false, error: "The grammar check didn't finish. Please try again." };
   }
@@ -244,12 +255,19 @@ export async function rereadChapterNow(chapterId: string): Promise<FormState> {
   if (chapter.wordCount < MIN_WORDS_TO_READ) {
     return { error: `Write at least ${MIN_WORDS_TO_READ} words before asking for a read.` };
   }
+  let reservation: Reservation;
+  try {
+    reservation = await reserve(user.id, "words", chapter.wordCount);
+  } catch (err) {
+    if (isLimitError(err)) return { error: err.message };
+    throw err;
+  }
   await db.chapterReview.upsert({
     where: { chapterId: chapter.id },
     update: { status: "QUEUED", error: null },
     create: { chapterId: chapter.id, status: "QUEUED" },
   });
-  after(() => rereadChapter(chapter.id));
+  after(() => rereadChapter(chapter.id, reservation));
   revalidatePath(`/manuscripts/${chapter.manuscript.id}`, "layout");
   return undefined;
 }
