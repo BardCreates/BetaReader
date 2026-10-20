@@ -310,6 +310,7 @@ model Conversation {
   chapterId    String?
   characterId  String?
   asOfChapter  Int?     // character chat: what the character knows, up to this chapter (1-based); null = whole book
+  mode         String?  // character chat: interview mode (src/lib/reader/interview.ts); null = open conversation
   title        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

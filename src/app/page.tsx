@@ -103,15 +103,16 @@ export default async function Home() {
         <section className="border-t border-line">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 sm:px-8 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
             <div>
-              <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Talk with your characters.</h2>
+              <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Interview your cast.</h2>
               <p className="mt-4 text-lg leading-relaxed text-muted">
                 Stuck on a scene? Not sure why she’d say that? Ask her. Your characters answer in their own voice, drawing on every page they appear
-                on, so you can interview them, test a scene before you write it, or find the backstory you haven’t figured out yet.
+                on, so you can push on a motivation, stress-test a backstory, find the line they’d never cross, or spot what you haven’t decided yet.
               </p>
               <ul className="mt-7 space-y-4">
                 {[
                   ["They stay true to your book.", "Each character knows the passages they’re in and the profile you’ve written, and won’t contradict the page."],
                   ["You can see what’s new.", "Anything they invent beyond your manuscript is highlighted, so you always know canon from brainstorm."],
+                  ["Guided interviews.", "Interrogate a motivation, stress-test a backstory, find what they’d never do, or ask for canon only, where gaps are named instead of filled."],
                   ["Meet them at any point in the story.", "Limit what they know to a chapter and talk to who they were back then."],
                   ["Keep what’s useful.", "Save a good answer to their profile in one click, and it becomes part of who they are."],
                 ].map(([t, d]) => (

@@ -42,8 +42,9 @@ export default async function CharactersPage({ params }: { params: Promise<{ id:
         <div>
           <h1 className="font-serif text-3xl font-semibold">Characters</h1>
           <p className="mt-1 max-w-2xl text-muted">
-            Talk with your characters to fill gaps and brainstorm. They answer in their own voice, drawing on the scenes they appear in, and mark
-            anything they invent ⟦like this⟧ so you can tell it apart from what’s on the page.
+            Interview your characters to find the gaps: push on a motivation, stress-test a backstory, or find what they’d never do. They answer
+            in their own voice from the scenes they appear in and the story bible, and mark anything they invent ⟦like this⟧ so you can tell it
+            apart from what’s on the page.
           </p>
         </div>
         <FindCharactersButton manuscriptId={ms.id} hasAny={ms.characters.length > 0} />

@@ -5,6 +5,7 @@ import { callStructured } from "./anthropic";
 import { castBlock, castWithPronouns } from "./cast";
 import { characterExcerpts } from "./characterContext";
 import { LINE_EDIT_MODEL } from "./lineEdit";
+import { interviewPrompt } from "./interview";
 
 /** Character discovery reads the whole book, so it uses the smaller, cheaper model. */
 const DISCOVERY_MODEL = process.env.ANTHROPIC_DISCOVERY_MODEL || LINE_EDIT_MODEL;
@@ -160,7 +161,7 @@ function profileLines(
 }
 
 /** The in-character system prompt: who they are, and the passages they appear in. */
-export async function characterSystemPrompt(characterId: string, asOfChapter: number | null) {
+export async function characterSystemPrompt(characterId: string, asOfChapter: number | null, mode: string | null = null) {
   const c = await db.character.findUniqueOrThrow({
     where: { id: characterId },
     include: {
@@ -177,6 +178,21 @@ export async function characterSystemPrompt(characterId: string, asOfChapter: nu
   const others = castBlock((await castWithPronouns(c.manuscriptId)).filter((m) => m.name !== c.name));
   const { text, mentions } = characterExcerpts(c.manuscript.chapters, c.name, aliases, { asOfChapter, maxWords: 20_000 });
   const total = c.manuscript.chapters.length;
+  // Story bible facts about this character, up to what they know: canon to answer from.
+  const names = [c.name, ...aliases].map((n) => n.trim().toLowerCase()).filter(Boolean);
+  const facts = (
+    await db.storyFact.findMany({
+      where: {
+        manuscriptId: c.manuscriptId,
+        subject: { in: names, mode: "insensitive" },
+        ...(asOfChapter ? { chapter: { index: { lt: asOfChapter } } } : {}),
+      },
+      orderBy: [{ chapter: { index: "asc" } }, { createdAt: "asc" }],
+      take: 150,
+      select: { fact: true, chapter: { select: { index: true } } },
+    })
+  ).map((f) => `- ${f.fact} (ch. ${f.chapter.index + 1})`);
+  const focus = interviewPrompt(mode, c.name);
 
   return `You are ${c.name}, a character in "${c.manuscript.title}"${c.manuscript.genre ? `, a ${c.manuscript.genre}` : ""}. The author is talking with you to understand you better and brainstorm. Stay in character: speak as ${c.name} would, in their voice, with their knowledge, opinions, blind spots and secrets.
 
@@ -190,9 +206,13 @@ Inventing: the author will ask about things the manuscript doesn't cover: your p
 
 Out of character: if the author's message starts with "OOC:", step out of character and answer as a thoughtful writing partner analysing ${c.name} (motivation, arc, consistency, what's missing), quoting the passages where useful. Otherwise never break character or mention being an AI.
 
+${focus ? `${focus}\n\n` : ""}Never write scenes, chapters or prose for the book; you are being interviewed, not co-writing.
+
 Keep replies conversational, usually a few short paragraphs. Ask the author a question back sometimes, the way ${c.name} would.
 
 ${profileLines(c, aliases)}${
+    facts.length ? `\nWhat the story has established about you (story bible, canon):\n${facts.join("\n")}\n` : ""
+  }${
     others ? `\n${others}\n` : ""
   }${
     c.notes?.trim() ? `\nThe author's own notes about you (treat as true):\n<author_notes>\n${c.notes.trim()}\n</author_notes>\n` : ""
