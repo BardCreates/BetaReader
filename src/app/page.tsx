@@ -1,18 +1,21 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { PublicFooter, PublicHeader } from "@/components/PublicChrome";
 import { buttonClass, ghostButtonClass } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
-import { PLANS } from "@/lib/plans";
+import { BOOK_PASS, PLANS } from "@/lib/plans";
+
+export const metadata = { title: { absolute: `${BRAND.name}: an honest first reader for your manuscript` } };
 
 export default async function Home() {
-  const session = await auth();
-  if (session?.user) redirect("/dashboard");
+  const signedIn = !!(await auth())?.user;
+  const start = signedIn ? "/dashboard" : "/signin";
+  const startLabel = signedIn ? "Open your manuscripts" : "Start your first read";
+  const fmt = (n: number) => n.toLocaleString("en-US");
 
   return (
     <div className="flex min-h-screen flex-col">
-      <PublicHeader />
+      <PublicHeader signedIn={signedIn} />
 
       <main className="flex-1">
         {/* Hero: the promise, and a page the reader has marked up. */}
@@ -26,17 +29,51 @@ export default async function Home() {
               what it guessed too early, and how to fix what isn’t working.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link href="/signin" className={`${buttonClass} px-5 py-2.5 text-base`}>
-                Start your first read
+              <Link href={start} className={`${buttonClass} px-5 py-2.5 text-base`}>
+                {startLabel}
               </Link>
-              <Link href="/pricing" className={`${ghostButtonClass} px-4 py-2.5 text-base`}>
-                See pricing
+              <Link href="#how-it-works" className={`${ghostButtonClass} px-4 py-2.5 text-base`}>
+                How it works
               </Link>
             </div>
-            <p className="mt-4 text-sm text-muted">Your first {PLANS.free.allowance.words.toLocaleString("en-US")} words are free. No card needed.</p>
+            <p className="mt-4 text-sm text-muted">Your first {fmt(PLANS.free.allowance.words)} words are free. No card needed.</p>
           </div>
 
           <AnnotatedPage />
+        </section>
+
+        {/* How it works: a real sequence, so it's numbered. */}
+        <section id="how-it-works" className="scroll-mt-8 border-t border-line">
+          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-8">
+            <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">How it works</h2>
+            <ol className="mt-10 grid gap-10 md:grid-cols-3">
+              {[
+                [
+                  "Upload your draft",
+                  "Export a .docx from Dabble, Word, Scrivener or Google Docs, or paste it in. Your chapter headings split it into chapters.",
+                ],
+                [
+                  "It reads, in order",
+                  "Chapter by chapter, carrying what it remembers forward. Each chapter takes a minute or two; close the tab and come back to a full report.",
+                ],
+                [
+                  "Revise, and check it worked",
+                  "Edit here or in your usual app and upload the new draft. Only changed chapters are read again, and you see whether each problem got fixed.",
+                ],
+              ].map(([title, text], i) => (
+                <li key={title} className="relative pl-14">
+                  <span
+                    aria-hidden
+                    className="absolute top-0 left-0 flex h-10 w-10 items-center justify-center rounded-full border border-line bg-card font-serif text-lg font-semibold text-accent"
+                  >
+                    {i + 1}
+                  </span>
+                  <h3 className="font-serif text-xl font-semibold">{title}</h3>
+                  <p className="mt-2 text-muted">{text}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
         </section>
 
         {/* What a read gives you, shown as the product shows it. */}
@@ -62,27 +99,90 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* Fits how authors already work. */}
-        <section className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-8 md:grid-cols-2">
-          <div>
-            <h2 className="font-serif text-3xl leading-tight font-semibold">Keep writing where you write.</h2>
-            <p className="mt-4 text-lg text-muted">
-              Draft in Dabble, Word, Scrivener or Google Docs. Export a .docx whenever you like: {BRAND.name} matches it to your chapters, keeps
-              every note on what you didn’t change, and only reads what did. Or write right here, with notes beside the text.
-            </p>
-          </div>
-          <ul className="space-y-4 self-center text-[1.02rem]">
+        {/* Everything else in the box. */}
+        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-8">
+          <h2 className="max-w-2xl font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Everything a first read should give you</h2>
+          <div className="mt-10 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              ["Editorial letter", "A developmental read of the whole book: what’s working, what isn’t, in priority order."],
-              ["Notes on the page", "Every reaction and issue anchored to the exact passage, with a concrete way to fix it."],
-              ["Pitch kit", "A logline, blurb, synopsis and query letter drafted from how the book actually read."],
-              ["Talk to your characters", "Ask them about scenes you haven’t written yet. Anything they invent is marked."],
+              ["An editorial letter", "A developmental read of the whole book: what it is, what’s working, and the biggest opportunities in priority order, with a revision plan."],
+              ["Notes on the page", "Reactions, praise and problems anchored to the exact passage, each problem with a concrete way to fix it. Mark them fixed as you go."],
+              ["A story bible", "The facts your book establishes, gathered as it reads: who’s who, injuries, ages, places, timeline and the rules of your world."],
+              ["Talk to your characters", "Ask them about scenes you haven’t written yet, in their own voice, grounded in the pages they appear on. Anything they invent is marked."],
+              ["A pitch kit", "A logline, back-cover blurb, synopsis and query letter drafted from how the book actually read, plus what made it hard to pitch."],
+              ["A place to write", "A clean editor with your chapters in a book outline, the reader’s notes beside the text, and grammar and style suggestions when you want them."],
             ].map(([t, d]) => (
-              <li key={t} className="border-l-2 border-line pl-4">
-                <span className="font-semibold">{t}.</span> <span className="text-muted">{d}</span>
-              </li>
+              <div key={t} className="border-l-2 border-line pl-5">
+                <h3 className="font-serif text-lg font-semibold">{t}</h3>
+                <p className="mt-1.5 text-muted">{d}</p>
+              </div>
             ))}
-          </ul>
+          </div>
+        </section>
+
+        {/* Fits how authors already work. */}
+        <section className="border-t border-line bg-card/60">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-20 sm:px-8 md:grid-cols-2">
+            <div>
+              <h2 className="font-serif text-3xl leading-tight font-semibold">Keep writing where you write.</h2>
+              <p className="mt-4 text-lg text-muted">
+                Most authors already have a home for their draft. Keep it. Export a .docx whenever you like and {BRAND.name} matches it to your chapters,
+                keeps every note on what you didn’t change, and reads only what did.
+              </p>
+            </div>
+            <UpdateDemo />
+          </div>
+        </section>
+
+        {/* Pricing preview. */}
+        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Simple pricing</h2>
+              <p className="mt-3 max-w-xl text-lg text-muted">Start free. Upgrade when you want a full read. No extra charges, ever: if you reach a limit, it simply tells you.</p>
+            </div>
+            <Link href="/pricing" className={ghostButtonClass}>
+              Compare plans
+            </Link>
+          </div>
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {[PLANS.free, PLANS.author, PLANS.pro].map((p) => (
+              <div key={p.id} className={`rounded-xl border bg-card p-6 ${p.id === "author" ? "border-accent" : "border-line"}`}>
+                <p className="font-serif text-xl font-semibold">{p.name}</p>
+                <p className="mt-3">
+                  <span className="font-serif text-3xl font-semibold">${p.monthlyPrice}</span>
+                  <span className="text-sm text-muted">{p.id === "free" ? " to start" : " a month"}</span>
+                </p>
+                <p className="mt-3 text-muted">
+                  {p.id === "free"
+                    ? `${fmt(p.allowance.words)} words read, about your opening chapters.`
+                    : `${fmt(p.allowance.words)} words read every month. ${p.tagline}`}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-5 text-sm text-muted">
+            Just finished a draft? A one-off book pass is ${BOOK_PASS.price} for a full read of a novel, no subscription.
+          </p>
+        </section>
+
+        {/* Questions authors ask. */}
+        <section className="border-t border-line">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-8 lg:grid-cols-[1fr_1.6fr]">
+            <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Questions authors ask</h2>
+            <div className="divide-y divide-line border-y border-line">
+              {FAQ.map(([q, a]) => (
+                <details key={q} className="group py-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-serif text-lg font-semibold [&::-webkit-details-marker]:hidden">
+                    {q}
+                    <span aria-hidden className="text-muted transition-transform group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <p className="mt-2 max-w-2xl text-muted">{a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-8">
@@ -94,17 +194,76 @@ export default async function Home() {
                 Free for your opening chapters. ${PLANS.author.monthlyPrice} a month for a full read every month.
               </p>
             </div>
-            <Link
-              href="/signin"
-              className="rounded-lg bg-white px-5 py-2.5 font-medium text-[#24407c] transition hover:opacity-90"
-            >
-              Start your first read
+            <Link href={start} className="rounded-lg bg-white px-5 py-2.5 font-medium text-[#24407c] transition hover:opacity-90">
+              {startLabel}
             </Link>
           </div>
         </section>
       </main>
 
       <PublicFooter />
+    </div>
+  );
+}
+
+const FAQ: [string, string][] = [
+  [
+    "Who can see my manuscript?",
+    "Only you. Manuscripts, notes and reports are private to your account, and you can delete a manuscript and everything about it at any time.",
+  ],
+  [
+    "Is this a replacement for human beta readers or an editor?",
+    "It’s a first reader you can use as often as you like: before you share a draft with people, and after every revision. It’s honest and specific, but it’s one reader’s experience. Use it to send people a stronger draft.",
+  ],
+  [
+    "Will it just tell me my book is wonderful?",
+    "No. It’s built to be honest: it names what isn’t working, quotes the passage, and suggests a fix, alongside what’s working so you don’t revise it away.",
+  ],
+  [
+    "Does it know what happens later in my book?",
+    "Not while it reads. Like a real reader, it only knows the chapters it has read so far, which is how it can tell you what you gave away too early and what never paid off.",
+  ],
+  [
+    "Which files can I upload?",
+    "Word (.docx), plain text and Markdown, or paste text in. From Dabble, Scrivener or Google Docs, export a .docx. Start each chapter with a heading like “Chapter 1” so it splits cleanly.",
+  ],
+  [
+    "How long does a read take?",
+    "About a minute or two per chapter, so a full novel takes around an hour. You don’t need to keep the page open.",
+  ],
+  [
+    "Can I cancel?",
+    "Yes, any time, from your account. You’re never charged more than your plan’s price.",
+  ],
+];
+
+/** Re-importing a revised draft, as the preview shows it. */
+function UpdateDemo() {
+  const rows = [
+    ["Edited", "bg-reaction-soft text-reaction", "Chapter 2: The Orchard", "about 18% different"],
+    ["New", "bg-praise-soft text-praise", "Chapter 3: The Visitor", "1,240 words"],
+    ["Unchanged", "bg-line text-muted", "Chapter 1: The Letter", "notes kept"],
+    ["Unchanged", "bg-line text-muted", "Chapter 4: Ashes", "notes kept"],
+  ];
+  return (
+    <div className="rounded-xl border border-line bg-card shadow-[0_12px_40px_-16px_rgb(22_29_46/0.2)]" aria-label="Example of updating from a new draft">
+      <div className="border-b border-line px-5 py-4">
+        <p className="font-serif text-lg font-semibold">What will change</p>
+        <p className="mt-0.5 text-sm text-muted">1 chapter edited, 1 new, 2 unchanged.</p>
+      </div>
+      <ul className="divide-y divide-line text-sm">
+        {rows.map(([chip, cls, title, detail]) => (
+          <li key={title} className="flex items-center gap-3 px-5 py-2.5">
+            <span className={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-medium ${cls}`}>{chip}</span>
+            <span className="min-w-0 flex-1 truncate">{title}</span>
+            <span className="text-xs text-muted">{detail}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-3.5">
+        <span className="text-sm text-muted">Then read only what changed.</span>
+        <span className={buttonClass}>Read the changes</span>
+      </div>
     </div>
   );
 }
@@ -144,7 +303,7 @@ function AnnotatedPage() {
           </MarginNote>
         </div>
       </div>
-      <figcaption className="mt-3 text-center text-sm text-muted">Notes from a real read, anchored to the passage.</figcaption>
+      <figcaption className="mt-3 text-center text-sm text-muted">Example notes, each anchored to the passage it’s about.</figcaption>
     </figure>
   );
 }

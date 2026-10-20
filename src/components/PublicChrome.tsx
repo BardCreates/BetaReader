@@ -11,7 +11,7 @@ export function PublicHeader({ signedIn = false }: { signedIn?: boolean }) {
         <Logo />
       </Link>
       <nav className="flex items-center gap-1 text-[0.95rem] sm:gap-2">
-        <Link href="/pricing" className="rounded-lg px-3 py-1.5 text-muted transition-colors hover:text-ink">
+        <Link href="/pricing" className="rounded-lg px-3 py-1.5 whitespace-nowrap text-muted transition-colors hover:text-ink">
           Pricing
         </Link>
         {signedIn ? (
@@ -20,12 +20,15 @@ export function PublicHeader({ signedIn = false }: { signedIn?: boolean }) {
           </Link>
         ) : (
           <>
-            <Link href="/signin" className="rounded-lg px-3 py-1.5 text-muted transition-colors hover:text-ink">
+            <Link href="/signin" className="rounded-lg px-3 py-1.5 whitespace-nowrap text-muted transition-colors hover:text-ink">
               Sign in
             </Link>
-            <Link href="/signin" className={`${buttonClass} hidden sm:inline-flex`}>
-              Start free
-            </Link>
+            {/* Wrapped so "hidden" isn't overridden by the button's own display style. */}
+            <span className="hidden sm:inline">
+              <Link href="/signin" className={buttonClass}>
+                Start free
+              </Link>
+            </span>
           </>
         )}
       </nav>
