@@ -47,7 +47,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         </div>
         <div>
           <h2 className="font-serif text-lg font-semibold">Yearly plans</h2>
-          <p className="mt-2 text-muted">Same monthly allowance, billed once a year for about two months free. Cancel any time.</p>
+          <p className="mt-2 text-muted">Same monthly allowance, billed once a year for about a third off. Cancel any time.</p>
         </div>
       </section>
     </main>

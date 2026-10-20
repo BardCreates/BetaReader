@@ -48,7 +48,7 @@ export const PLANS: Record<PlanId, Plan> = {
     id: "author",
     name: "Author",
     monthlyPrice: 19,
-    yearlyPrice: 180,
+    yearlyPrice: 149,
     tagline: "A full read every month, plus revisions.",
     maxManuscripts: 10,
     maxWordsPerManuscript: 250_000,
@@ -58,7 +58,7 @@ export const PLANS: Record<PlanId, Plan> = {
     id: "pro",
     name: "Pro",
     monthlyPrice: 39,
-    yearlyPrice: 372,
+    yearlyPrice: 299,
     tagline: "For series, several books, and heavy revision.",
     maxManuscripts: 50,
     maxWordsPerManuscript: 400_000,
@@ -72,6 +72,11 @@ export const BOOK_PASS = {
   price: 29,
   credit: { words: 150_000, grammarWords: 150_000, chat: 50, pitchKits: 2, costCapUsd: 6 } satisfies Allowance,
 };
+
+/** Percent saved by paying yearly, rounded down (Author and Pro are both about a third). */
+export function yearlySavingPct(plan: Plan) {
+  return plan.monthlyPrice ? Math.floor((1 - plan.yearlyPrice / (plan.monthlyPrice * 12)) * 100) : 0;
+}
 
 export function planFor(plan: string | null | undefined): Plan {
   return PLANS[(plan as PlanId) in PLANS ? (plan as PlanId) : "free"];

@@ -90,7 +90,7 @@ src/lib/plans.ts                plan limits (free / author / pro)
 
 ## Billing & cost control
 
-Plans live in `src/lib/plans.ts`: Free (10,000 words once), Author ($19/mo, $180/yr), Pro ($39/mo, $372/yr), plus a one-off $29 **book pass**. Customers only ever pay the plan price: there are no overage charges. Limits stop work instead.
+Plans live in `src/lib/plans.ts`: Free (10,000 words once), Author ($19/mo, $149/yr), Pro ($39/mo, $299/yr), plus a one-off $29 **book pass**. Customers only ever pay the plan price: there are no overage charges. Limits stop work instead.
 
 Three layers keep costs bounded (`src/lib/billing`):
 
@@ -101,8 +101,8 @@ Three layers keep costs bounded (`src/lib/billing`):
 ### Setting up Stripe
 
 1. In the Stripe dashboard (start in **test mode**), create products and prices:
-   - Author: recurring $19/month and $180/year
-   - Pro: recurring $39/month and $372/year
+   - Author: recurring $19/month and $149/year
+   - Pro: recurring $39/month and $299/year
    - Book pass: one-time $29
 2. Copy each price id (`price_...`) and your secret key into `.env` (see `.env.example`).
 3. Add a webhook endpoint at `https://<your app>/api/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` and `charge.refunded`, and put its signing secret in `STRIPE_WEBHOOK_SECRET`. Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.

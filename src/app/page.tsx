@@ -128,6 +128,22 @@ export default async function Home() {
           </div>
         </section>
 
+        {/* What sets it apart, said as the choices behind it (no names, no "better than"). */}
+        <section className="border-t border-line">
+          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-8">
+            <h2 className="max-w-2xl font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Made the way readers read</h2>
+            <p className="mt-4 max-w-2xl text-lg text-muted">A few deliberate choices, so the feedback is worth acting on.</p>
+            <div className="mt-12 grid gap-x-12 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
+              {PRINCIPLES.map(([title, text]) => (
+                <div key={title}>
+                  <h3 className="font-serif text-xl font-semibold">{title}</h3>
+                  <p className="mt-2 text-muted">{text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Everything else in the box. */}
         <section className="border-t border-line bg-card/60">
           <div className="mx-auto max-w-6xl px-4 py-20 sm:px-8">
@@ -188,6 +204,7 @@ export default async function Home() {
                     ? `${fmt(p.allowance.words)} words read, about your opening chapters.`
                     : `${fmt(p.allowance.words)} words read every month. ${p.tagline}`}
                 </p>
+                {p.id !== "free" && <p className="mt-2 text-sm text-muted">Or ${p.yearlyPrice} a year, about a third off.</p>}
               </div>
             ))}
           </div>
@@ -236,6 +253,34 @@ export default async function Home() {
     </div>
   );
 }
+
+/** Each one answers a common shortcoming of AI feedback tools without naming anyone. */
+const PRINCIPLES: [string, string][] = [
+  [
+    "It never skims ahead.",
+    "It reads in order, knowing only the chapters behind it. That’s how it can tell you the twist you gave away in chapter three, or the promise you never kept. A tool that sees the ending first can’t.",
+  ],
+  [
+    "Your whole book, every chapter.",
+    `No chapter caps and no sampling: a ${PLANS.author.allowance.words.toLocaleString("en-US")}-word novel gets every chapter read and one letter about the whole thing.`,
+  ],
+  [
+    "Notes, not scores.",
+    "No grades, no readability numbers. Every note quotes the exact passage, says what it did to the reader, and offers a way to fix it.",
+  ],
+  [
+    "Built for the second draft.",
+    "Bring back a revised draft and it keeps what you didn’t change, reads what you did, and tells you whether each problem is actually fixed.",
+  ],
+  [
+    "It reads. It never writes your book.",
+    "Readthrough doesn’t generate chapters or rewrite your prose. Suggestions stay suggestions, and your book stays in your voice.",
+  ],
+  [
+    "Words, not credits.",
+    "Plans are measured in words read, in plain numbers. No credits to decode and no surprise charges: if you reach a limit, it simply tells you.",
+  ],
+];
 
 const FAQ: [string, string][] = [
   [

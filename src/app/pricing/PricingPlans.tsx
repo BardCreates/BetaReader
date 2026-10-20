@@ -5,7 +5,7 @@ import { useState } from "react";
 import { startCheckout } from "@/app/billingActions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { buttonClass, ghostButtonClass } from "@/components/ui";
-import { BOOK_PASS, PLANS, type Plan } from "@/lib/plans";
+import { BOOK_PASS, PLANS, yearlySavingPct, type Plan } from "@/lib/plans";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -38,7 +38,7 @@ export function PricingPlans(props: { loggedIn: boolean; currentPlan: string | n
             onClick={() => setYearly(y)}
             className={`rounded-full px-4 py-1.5 transition ${yearly === y ? "bg-accent font-medium text-white dark:text-paper" : "text-muted hover:text-ink"}`}
           >
-            {y ? "Yearly · 2 months free" : "Monthly"}
+            {y ? `Yearly · save ${yearlySavingPct(PLANS.author)}%` : "Monthly"}
           </button>
         ))}
       </div>
@@ -63,7 +63,7 @@ export function PricingPlans(props: { loggedIn: boolean; currentPlan: string | n
                 <span className="font-serif text-4xl font-semibold tabular-nums">${price % 1 ? price.toFixed(2) : price}</span>
                 <span className="text-sm text-muted">{plan.id === "free" ? " forever" : " / month"}</span>
               </p>
-              <p className="h-5 text-xs text-muted">{plan.id !== "free" && yearly ? `$${plan.yearlyPrice} billed yearly` : ""}</p>
+              <p className="h-5 text-xs text-muted">{plan.id !== "free" && yearly ? `$${plan.yearlyPrice} billed yearly, save ${yearlySavingPct(plan)}%` : ""}</p>
               <ul className="mt-5 flex-1 space-y-2 text-sm">
                 {features(plan).map((f) => (
                   <li key={f} className="flex gap-2">
