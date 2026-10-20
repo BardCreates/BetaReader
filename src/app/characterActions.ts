@@ -45,20 +45,42 @@ export async function addCharacter(manuscriptId: string, _prev: CharacterFormSta
   redirect(`/manuscripts/${ms.id}/characters/${c.id}`);
 }
 
-export async function updateCharacter(
-  characterId: string,
-  fields: { notes?: string; summary?: string; role?: string; aliases?: string },
-): Promise<CharacterFormState> {
+export type CharacterFields = {
+  notes?: string;
+  summary?: string;
+  role?: string;
+  aliases?: string;
+  pronouns?: string;
+  age?: string;
+  appearance?: string;
+  personality?: string;
+  wants?: string;
+  fears?: string;
+  backstory?: string;
+  voice?: string;
+};
+
+export async function updateCharacter(characterId: string, fields: CharacterFields): Promise<CharacterFormState> {
   const user = await requireUser();
   const c = await ownedCharacter(characterId, user.id);
   if (!c) return { error: "Character not found." };
   const clip = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : undefined);
+  // Short fields: trimmed, and blank means "not set".
+  const short = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) || null : undefined);
   await db.character.update({
     where: { id: c.id },
     data: {
       notes: clip(fields.notes, 50_000),
       summary: clip(fields.summary, 5_000),
       role: clip(fields.role, 100),
+      pronouns: short(fields.pronouns, 40),
+      age: short(fields.age, 60),
+      appearance: clip(fields.appearance, 5_000),
+      personality: clip(fields.personality, 5_000),
+      wants: clip(fields.wants, 5_000),
+      fears: clip(fields.fears, 5_000),
+      backstory: clip(fields.backstory, 20_000),
+      voice: clip(fields.voice, 5_000),
       aliases:
         typeof fields.aliases === "string"
           ? fields.aliases
@@ -93,4 +115,52 @@ export async function deleteCharacter(characterId: string) {
   await db.character.delete({ where: { id: c.id } });
   revalidatePath(`/manuscripts/${c.manuscriptId}`, "layout");
   redirect(`/manuscripts/${c.manuscriptId}/characters`);
+}
+
+// ─── Pictures ────────────────────────────────────────────────────
+
+const MAX_IMAGE_BYTES = 1_500_000; // the browser resizes to 512px first, so real uploads are far smaller
+
+/** Identify the image from its first bytes; anything else (SVG, HTML, …) is refused. */
+function sniffImage(b: Uint8Array): "image/jpeg" | "image/png" | "image/webp" | null {
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
+  const ascii = (from: number, to: number) => String.fromCharCode(...b.slice(from, to));
+  if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "image/webp";
+  return null;
+}
+
+export async function uploadCharacterImage(characterId: string, form: FormData): Promise<CharacterFormState> {
+  const user = await requireUser();
+  const c = await ownedCharacter(characterId, user.id);
+  if (!c) return { error: "Character not found." };
+  const file = form.get("image");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a picture to upload." };
+  if (file.size > MAX_IMAGE_BYTES) return { error: "That picture is too large. Try a smaller one." };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = sniffImage(bytes);
+  if (!type) return { error: "Upload a JPEG, PNG or WebP picture." };
+  const now = new Date();
+  await db.$transaction([
+    db.characterImage.upsert({
+      where: { characterId: c.id },
+      update: { data: bytes, type },
+      create: { characterId: c.id, data: bytes, type },
+    }),
+    db.character.update({ where: { id: c.id }, data: { imageUpdatedAt: now } }),
+  ]);
+  revalidatePath(`/manuscripts/${c.manuscriptId}/characters`, "layout");
+  return { message: "Picture saved." };
+}
+
+export async function removeCharacterImage(characterId: string): Promise<CharacterFormState> {
+  const user = await requireUser();
+  const c = await ownedCharacter(characterId, user.id);
+  if (!c) return { error: "Character not found." };
+  await db.$transaction([
+    db.characterImage.deleteMany({ where: { characterId: c.id } }),
+    db.character.update({ where: { id: c.id }, data: { imageUpdatedAt: null } }),
+  ]);
+  revalidatePath(`/manuscripts/${c.manuscriptId}/characters`, "layout");
+  return { message: "Picture removed." };
 }

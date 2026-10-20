@@ -4,6 +4,7 @@ import { isLimitError, release, reserve, type Meter, type Reservation } from "@/
 import { db } from "@/lib/db";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { MODEL, callStructured } from "./anthropic";
+import { castBlock, castWithPronouns } from "./cast";
 import { bookReportUserPrompt, chapterUserPrompt, readerSystemPrompt, type ManuscriptContext } from "./prompts";
 import { BookReportSchema, ChapterFeedbackSchema, bookReportTool, chapterFeedbackTool } from "./schemas";
 
@@ -88,6 +89,7 @@ export async function readManuscript(manuscriptId: string, opts: { rereadChanged
     authorGoals: ms.authorGoals,
     persona: ms.persona,
     chapterCount: ms.chapters.length,
+    cast: castBlock(await castWithPronouns(ms.id)),
   };
   // The system prompt is identical for every chapter, so cache it.
   const system = [{ type: "text" as const, text: readerSystemPrompt(ctx), cache_control: { type: "ephemeral" as const } }];
@@ -160,6 +162,7 @@ async function rereadChapterInner(chapterId: string) {
     authorGoals: ms.authorGoals,
     persona: ms.persona,
     chapterCount: ms._count.chapters,
+    cast: castBlock(await castWithPronouns(ms.id)),
   };
   await readChapter({
     system: [{ type: "text", text: readerSystemPrompt(ctx), cache_control: { type: "ephemeral" } }],

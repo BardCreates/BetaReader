@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/auth";
+import { CharacterAvatar } from "@/components/CharacterAvatar";
 import { Card } from "@/components/ui";
 import { db } from "@/lib/db";
 import { FEATURES } from "@/lib/features";
@@ -19,7 +20,16 @@ export default async function CharactersPage({ params }: { params: Promise<{ id:
       title: true,
       characters: {
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, role: true, summary: true, notes: true, _count: { select: { conversations: true } } },
+        select: {
+          id: true,
+          name: true,
+          role: true,
+          pronouns: true,
+          summary: true,
+          notes: true,
+          imageUpdatedAt: true,
+          _count: { select: { conversations: true } },
+        },
       },
     },
   });
@@ -50,9 +60,12 @@ export default async function CharactersPage({ params }: { params: Promise<{ id:
             <li key={c.id}>
               <Link href={`${base}/${c.id}`} className="block h-full">
                 <Card className="h-full transition hover:border-accent/50 hover:shadow-sm">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <h2 className="font-serif text-xl font-semibold">{c.name}</h2>
-                    {c.role && <span className="text-sm text-muted">{c.role}</span>}
+                  <div className="flex items-center gap-3.5">
+                    <CharacterAvatar id={c.id} name={c.name} imageUpdatedAt={c.imageUpdatedAt} size={48} />
+                    <div className="min-w-0">
+                      <h2 className="truncate font-serif text-xl font-semibold">{c.name}</h2>
+                      {(c.pronouns || c.role) && <p className="text-sm text-muted">{[c.pronouns, c.role].filter(Boolean).join(", ")}</p>}
+                    </div>
                   </div>
                   <p className="mt-2 line-clamp-3 text-sm text-muted">{c.summary || c.notes || "No description yet."}</p>
                   <p className="mt-3 text-xs text-accent">

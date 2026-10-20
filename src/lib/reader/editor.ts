@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { castBlock, castWithPronouns } from "./cast";
 import { editorSystemPrompt } from "./prompts";
 import type { BookReportContent } from "./schemas";
 
@@ -64,6 +65,7 @@ ${notes.map((n) => `- [${n.kind.toLowerCase()} · ${n.category}${n.status !== "O
       authorGoals: ms.authorGoals,
       persona: ms.persona,
       chapterCount: ms.chapters.length,
+      cast: castBlock(await castWithPronouns(manuscriptId)),
     },
     parts.join("\n\n"),
   );

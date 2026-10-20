@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chapterUserPrompt } from "./prompts";
+import { castBlock, chapterUserPrompt, readerSystemPrompt } from "./prompts";
 
 const base = { index: 2, total: 10, title: "Ashes", content: "She opened the letter.", memory: "Mara, a letter." };
 
@@ -53,4 +53,17 @@ test("story bible is grouped by subject, given ids, and placed before the chapte
 
 test("no story bible section for the first chapter", () => {
   assert.ok(!chapterUserPrompt({ ...base, index: 0, bible: [] }).includes("<story_bible>"));
+});
+
+test("pronoun guidance lists each character and goes in the reader's brief", () => {
+  const cast = castBlock([
+    { name: "Mara Holt", aliases: ["Mara"], pronouns: "she/her" },
+    { name: "Ash", aliases: [], pronouns: "they/them" },
+  ]);
+  assert.match(cast, /- Mara Holt \(also "Mara"\): she\/her/);
+  assert.match(cast, /- Ash: they\/them/);
+  assert.match(cast, /tells you nothing about the story/);
+  assert.equal(castBlock([]), "");
+  const system = readerSystemPrompt({ title: "T", genre: null, audience: null, authorGoals: null, persona: "enthusiast", chapterCount: 3, cast });
+  assert.ok(system.includes(`Mara Holt (also "Mara"): she/her`));
 });

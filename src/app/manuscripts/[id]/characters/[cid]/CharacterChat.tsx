@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { appendCharacterNote } from "@/app/characterActions";
+import { CharacterAvatar } from "@/components/CharacterAvatar";
 import { Markdown } from "@/components/Markdown";
 import { buttonClass, Card, inputClass } from "@/components/ui";
 
@@ -12,6 +13,7 @@ export function CharacterChat(props: {
   manuscriptId: string;
   characterId: string;
   name: string;
+  imageUpdatedAt: string | null;
   totalChapters: number;
   conversationId: string | null;
   asOfChapter: number | null;
@@ -135,7 +137,10 @@ export function CharacterChat(props: {
             </div>
           ) : (
             <div key={m.id} className="max-w-[92%] rounded-2xl rounded-bl-sm border border-line bg-card px-5 py-4">
-              <p className="mb-1 text-xs font-medium text-accent">{first}</p>
+              <p className="mb-2 flex items-center gap-2 text-xs font-medium text-accent">
+                <CharacterAvatar id={props.characterId} name={props.name} imageUpdatedAt={props.imageUpdatedAt} size={24} />
+                {first}
+              </p>
               {m.content ? <Markdown text={m.content} /> : <span className="animate-pulse text-sm text-muted">…</span>}
               {m.content && !(streaming && m === messages.at(-1)) && (
                 <button

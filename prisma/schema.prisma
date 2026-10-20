@@ -265,13 +265,36 @@ model Character {
   role         String?  // protagonist, antagonist, supporting…
   summary      String?  @db.Text // who they are, drawn from the manuscript
   notes        String?  @db.Text // the author's own notes / character bible
+
+  // Profile. Pronouns are passed to every AI prompt so the reader never misgenders anyone.
+  pronouns     String?  // "she/her", "they/them"…
+  age          String?  // free text: "17", "mid-forties"
+  appearance   String?  @db.Text
+  personality  String?  @db.Text
+  wants        String?  @db.Text // what they want
+  fears        String?  @db.Text // what they fear / what stands in their way
+  backstory    String?  @db.Text
+  voice        String?  @db.Text // how they talk
+  imageUpdatedAt DateTime? // set when a picture is uploaded; also busts the image URL cache
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  manuscript    Manuscript     @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  manuscript    Manuscript      @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
   conversations Conversation[]
+  image         CharacterImage?
 
   @@index([manuscriptId])
+}
+
+// A character's picture, kept apart so ordinary character queries never load the bytes.
+model CharacterImage {
+  characterId String   @id
+  data        Bytes    // JPEG, PNG or WebP, resized in the browser before upload
+  type        String   // image/jpeg | image/png | image/webp
+  updatedAt   DateTime @updatedAt
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 }
 
 // ─── Conversations (editor chat — off in v1 — and character chat) ─

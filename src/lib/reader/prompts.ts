@@ -7,6 +7,8 @@ export type ManuscriptContext = {
   authorGoals: string | null;
   persona: string;
   chapterCount: number;
+  /** Pronoun guidance from castBlock(); empty when none are set. */
+  cast?: string;
 };
 
 const CORE_PRINCIPLES = `You are a beta reader for an author's work-in-progress manuscript.
@@ -31,7 +33,7 @@ About this manuscript:
 - Genre: ${ctx.genre || "not specified"}
 - Intended audience: ${ctx.audience || "not specified"}
 - Length: ${ctx.chapterCount} chapters
-${ctx.authorGoals ? `\nWhat the author especially wants feedback on:\n${ctx.authorGoals}\n` : ""}`;
+${ctx.authorGoals ? `\nWhat the author especially wants feedback on:\n${ctx.authorGoals}\n` : ""}${ctx.cast ? `\n${ctx.cast}\n` : ""}`;
 }
 
 export function readerSystemPrompt(ctx: ManuscriptContext) {
@@ -170,4 +172,17 @@ Keep replies conversational and focused; use short lists only when they help. Qu
 ${lensAndBrief(ctx)}
 
 ${context}`;
+}
+
+export type CastMember = { name: string; aliases: string[]; pronouns: string };
+
+/**
+ * A prompt block telling the model how to refer to each character. Only names and pronouns:
+ * it gives the reader nothing about the plot, so reading in order stays spoiler-free.
+ */
+export function castBlock(cast: CastMember[]): string {
+  if (!cast.length) return "";
+  const lines = cast.map((c) => `- ${c.name}${c.aliases.length ? ` (also "${c.aliases.join('", "')}")` : ""}: ${c.pronouns}`);
+  return `How to refer to the characters, from the author. Always use these pronouns when you mention them, in every part of your response. This list only sets pronouns; it tells you nothing about the story.
+${lines.join("\n")}`;
 }

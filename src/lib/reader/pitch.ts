@@ -3,6 +3,7 @@ import { release, type Reservation } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
 import { countWords } from "@/lib/manuscript/split";
 import { MODEL, callStructured } from "./anthropic";
+import { castBlock, castWithPronouns } from "./cast";
 import { PitchKitSchema, pitchKitTool, type BookReportContent } from "./schemas";
 
 const SYSTEM = `You write pitch materials for novelists: loglines, back-cover blurbs, synopses and query letters, the way an experienced agent or acquiring editor would.
@@ -36,6 +37,7 @@ export async function writePitchKit(manuscriptId: string, reservation: Reservati
 Genre: ${ms.genre || "not specified"}
 Audience: ${ms.audience || "not specified"}
 Length: ${words.toLocaleString()} words, ${ms.chapters.length} chapters
+${castBlock(await castWithPronouns(ms.id))}
 
 <opening_of_chapter_1>
 ${opening}
