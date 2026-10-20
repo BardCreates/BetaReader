@@ -107,6 +107,7 @@ model Manuscript {
   persona     String        @default("enthusiast") // see src/lib/reader/personas.ts
   wordCount   Int           @default(0)
   status      ReadingStatus @default(DRAFT)
+  draft       Int           @default(1) // which draft this is: goes up each time a revised draft is imported
   error       String?       @db.Text
   errorCode   String?       // "LIMIT" when a read paused because the plan's allowance ran out
   createdAt   DateTime      @default(now())
@@ -120,6 +121,7 @@ model Manuscript {
   characters    Character[]
   facts         StoryFact[]
   pitchKit      PitchKit?
+  snapshots     DraftSnapshot[]
 
   @@index([userId])
 }
@@ -156,6 +158,9 @@ model ChapterReview {
   reaction   String?       @db.Text // first-person, as-I-read reaction
   summary    String?       @db.Text // what happened, as the reader understood it
   engagement Int?          // 1–10: how much the reader wanted to keep going
+  confusion  Int?          // 1–10: how lost the reader was (1 = always clear)
+  driftQuote  String?      @db.Text // the passage where attention slipped most (drop-off map)
+  driftReason String?      @db.Text
   strengths  Json?         // string[]
   questions  Json?         // string[] — open questions the reader is carrying
   predictions Json?        // string[] — what the reader thinks will happen
@@ -348,6 +353,23 @@ model StoryFact {
 
   @@index([manuscriptId])
   @@index([chapterId])
+}
+
+// ─── Draft history ───────────────────────────────────────────────
+
+// How the read stood for one draft, kept when a revised draft replaces it (or a fresh read
+// starts over), so the next draft's read can be compared with it. See src/lib/reader/drafts.ts.
+model DraftSnapshot {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  draft        Int      // the draft number this records
+  reason       String   // reimport | fresh_read
+  data         Json     // SnapshotData
+  createdAt    DateTime @default(now())
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+
+  @@index([manuscriptId, createdAt])
 }
 
 // ─── Pitch kit ───────────────────────────────────────────────────

@@ -42,6 +42,9 @@ export function Sidebar({ email, data }: { email: string | null; data: SidebarDa
               Overview &amp; report
               {ms.reading && <Dot state="reading" />}
             </NavLink>
+            <NavLink href={`${base}/dropoff`} active={pathname === `${base}/dropoff`}>
+              Drop-off map
+            </NavLink>
             <NavLink href={`${base}/journey`} active={pathname === `${base}/journey`}>
               Reader journey
             </NavLink>

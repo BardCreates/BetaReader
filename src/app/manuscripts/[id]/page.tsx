@@ -178,7 +178,12 @@ export default async function ManuscriptPage({
           <aside className="space-y-4">
             {doneCount > 0 && (
               <Card>
-                <p className="mb-3 text-sm font-medium">Engagement by chapter</p>
+                <p className="mb-3 flex items-baseline justify-between text-sm font-medium">
+                  Engagement by chapter
+                  <Link href={`${base}/dropoff`} className="text-xs font-normal text-accent hover:underline">
+                    Drop-off map
+                  </Link>
+                </p>
                 <EngagementStrip
                   values={ms.chapters.map((c) => ({
                     label: c.title,
@@ -191,6 +196,7 @@ export default async function ManuscriptPage({
             <Card className="p-2">
               <p className="px-3 pt-2 pb-1 text-sm font-medium">Your book</p>
               <ul>
+                <Tool href={`${base}/dropoff`} title="Drop-off map" detail={doneCount ? "Where a reader would stop" : "Built during a read"} />
                 <Tool href={`${base}/journey`} title="Reader journey" detail={ms._count.threads ? `${ms._count.threads} questions and predictions` : "Built during a read"} />
                 <Tool
                   href={`${base}/bible`}
