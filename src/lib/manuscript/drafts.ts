@@ -24,6 +24,8 @@ type Verdict = "fixed" | "partly" | "still_there";
 export type RevisionCheckData = {
   previousEngagement: number | null;
   notes: { quote: string; comment: string; verdict: Verdict; explanation: string }[];
+  /** There were earlier issues, but the reader didn't report on them. */
+  unchecked?: boolean;
 };
 
 export type DraftChapterInput = {
@@ -48,6 +50,7 @@ export type DraftChapterResult = {
   before: number | null;
   after: number | null;
   checked: { quote: string; comment: string; verdict: Verdict; explanation: string }[];
+  unchecked: boolean;
   continuity: { id: string; quote: string; comment: string }[];
 };
 
@@ -63,16 +66,21 @@ export type DraftComparison = {
  * how engagement moved, and which continuity problems the new version has. Built from what each read
  * already recorded (revisionCheck, continuity notes), so it costs nothing to show.
  */
-export function compareDraft(draft: number, chapters: DraftChapterInput[]): DraftComparison {
+export function compareDraft(draft: number, chapters: DraftChapterInput[], summary?: DraftSummary | null): DraftComparison {
+  // With the import's summary, only chapters it changed or added count (plus any edited in the app
+  // since), so a full re-read or a chapter that was simply never read isn't mistaken for a revision.
+  const touched = summary ? new Set([...summary.changed, ...summary.added]) : null;
   const out: DraftChapterResult[] = [];
   const waiting: DraftComparison["waiting"] = [];
   for (const c of chapters) {
     const r = c.review;
+    const inDraft = touched ? touched.has(c.title) : true;
     if (!r || r.draft !== draft || c.stale) {
       // Changed (or new) in this draft but not read in its current form yet.
-      if (c.stale || (r === null && draft > 1)) waiting.push({ number: c.number, title: c.title });
+      if (c.stale || (r === null && draft > 1 && inDraft)) waiting.push({ number: c.number, title: c.title });
       continue;
     }
+    if (!inDraft && !r.revisionCheck) continue; // read for the first time now, but not part of this draft's changes
     out.push({
       number: c.number,
       title: c.title,
@@ -80,6 +88,7 @@ export function compareDraft(draft: number, chapters: DraftChapterInput[]): Draf
       before: r.revisionCheck?.previousEngagement ?? null,
       after: r.engagement,
       checked: r.revisionCheck?.notes ?? [],
+      unchecked: r.revisionCheck?.unchecked === true,
       continuity: r.continuity,
     });
   }
@@ -99,7 +108,8 @@ export function compareDraft(draft: number, chapters: DraftChapterInput[]): Draf
 }
 
 /** "2 of 3 earlier issues fixed", "nothing to check" — one line per chapter for the changes page. */
-export function checkedLine(checked: { verdict: Verdict }[]): string {
+export function checkedLine(checked: { verdict: Verdict }[], unchecked = false): string {
+  if (unchecked) return "Earlier issues weren’t checked on this read";
   if (!checked.length) return "No earlier issues to check";
   const fixed = checked.filter((n) => n.verdict === "fixed").length;
   return `${fixed} of ${checked.length} earlier issue${checked.length === 1 ? "" : "s"} fixed`;

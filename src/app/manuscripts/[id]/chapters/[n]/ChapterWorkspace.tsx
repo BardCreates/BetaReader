@@ -31,6 +31,8 @@ export type NoteView = {
 export type IntentCheck = { intent: string; landed: "yes" | "partly" | "no"; explanation: string };
 export type RevisionCheck = {
   previousEngagement: number | null;
+  /** There were earlier issues, but the reader didn't report on them. */
+  unchecked?: boolean;
   notes: { quote: string; comment: string; authorStatus: string; verdict: "fixed" | "partly" | "still_there"; explanation: string }[];
 };
 
@@ -46,7 +48,7 @@ export type ReviewView = {
   notes: NoteView[];
   intentCheck: IntentCheck | null;
   revisionCheck: RevisionCheck | null;
-  dropOff: { quote: string; why: string } | null;
+  dropOff: { quote: string | null; why: string } | null;
 };
 
 type Props = {
@@ -279,7 +281,7 @@ export function ChapterWorkspace(p: Props) {
               {p.review.dropOff && (
                 <div className="mt-4 border-t border-line pt-4" data-testid="drop-off">
                   <p className="font-medium text-muted">Where my attention dipped</p>
-                  <p className="mt-2 font-serif italic">“{p.review.dropOff.quote}”</p>
+                  {p.review.dropOff.quote && <p className="mt-2 font-serif italic">“{p.review.dropOff.quote}”</p>}
                   <p className="mt-1 leading-relaxed">{p.review.dropOff.why}</p>
                 </div>
               )}
@@ -715,7 +717,7 @@ function RevisionCheckCard({ check, engagement }: { check: RevisionCheck; engage
         )}
       </div>
       {check.notes.length === 0 ? (
-        <p className="mt-2 text-muted">No earlier issues to check.</p>
+        <p className="mt-2 text-muted">{check.unchecked ? "The reader didn’t report on the earlier issues this time. Re-read to check them." : "No earlier issues to check."}</p>
       ) : (
         <ul className="mt-3 space-y-3">
           {check.notes.map((n, i) => {

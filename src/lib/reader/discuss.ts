@@ -16,7 +16,7 @@ export async function ownedNote(noteId: string, userId: string) {
       suggestion: true,
       status: true,
       conflictFact: true,
-      conflictChapter: true,
+      conflictChapter: { select: { index: true } },
       review: {
         select: {
           reaction: true,
@@ -82,7 +82,7 @@ export async function noteDiscussionSystem(note: NonNullable<Awaited<ReturnType<
         comment: note.comment,
         suggestion: note.suggestion,
         status: note.status,
-        conflict: note.conflictFact && note.conflictChapter ? { fact: note.conflictFact, chapter: note.conflictChapter } : null,
+        conflict: note.conflictFact && note.conflictChapter ? { fact: note.conflictFact, chapter: note.conflictChapter.index + 1 } : null,
       },
     },
   );

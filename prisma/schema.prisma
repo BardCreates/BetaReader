@@ -157,6 +157,7 @@ model Chapter {
   threadsRaised   ReaderThread[] @relation("raisedIn")
   threadsResolved ReaderThread[] @relation("resolvedIn")
   facts           StoryFact[]
+  conflictNotes   Note[]         @relation("conflictOf")
 
   @@unique([manuscriptId, index])
 }
@@ -219,11 +220,13 @@ model Note {
   createdAt   DateTime   @default(now())
 
   // Continuity notes: the earlier fact this passage contradicts, for the continuity ledger.
-  conflictFact    String? @db.Text
-  conflictChapter Int?    // 1-based chapter where that fact was established
+  // Linked by id, so the chapter number stays right when a re-import inserts or removes chapters.
+  conflictFact      String?  @db.Text
+  conflictChapterId String?
 
-  review        ChapterReview  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  conversations Conversation[]
+  review          ChapterReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  conflictChapter Chapter?      @relation("conflictOf", fields: [conflictChapterId], references: [id], onDelete: SetNull)
+  conversation    Conversation?
 
   @@index([reviewId])
 }
@@ -328,7 +331,7 @@ model Conversation {
   characterId  String?
   asOfChapter  Int?     // character chat: what the character knows, up to this chapter (1-based); null = whole book
   mode         String?  // character interview mode, see INTERVIEW_MODES in src/lib/reader/characters.ts
-  noteId       String?  // a conversation about one reader note
+  noteId       String?  @unique // a conversation about one reader note (one per note)
   title        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -341,7 +344,6 @@ model Conversation {
 
   @@index([manuscriptId])
   @@index([characterId])
-  @@index([noteId])
 }
 
 model Message {

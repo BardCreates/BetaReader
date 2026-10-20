@@ -23,7 +23,10 @@ export default async function ChapterPage({ params }: { params: Promise<{ id: st
     include: {
       review: {
         include: {
-          notes: { orderBy: [{ startOffset: "asc" }, { createdAt: "asc" }], include: { _count: { select: { conversations: true } } } },
+          notes: {
+            orderBy: [{ startOffset: "asc" }, { createdAt: "asc" }],
+            include: { conversation: { select: { id: true } }, conflictChapter: { select: { index: true } } },
+          },
         },
       },
     },
@@ -76,8 +79,8 @@ export default async function ChapterPage({ params }: { params: Promise<{ id: st
                   comment: note.comment,
                   suggestion: note.suggestion,
                   status: note.status,
-                  conflict: note.conflictFact && note.conflictChapter ? { fact: note.conflictFact, chapter: note.conflictChapter } : null,
-                  discussed: note._count.conversations > 0,
+                  conflict: note.conflictFact && note.conflictChapter ? { fact: note.conflictFact, chapter: note.conflictChapter.index + 1 } : null,
+                  discussed: note.conversation != null,
                 })),
               }
             : null

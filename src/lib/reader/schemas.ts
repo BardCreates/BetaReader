@@ -62,7 +62,8 @@ export const ChapterFeedbackSchema = z.object({
   revisionCheck: z
     .array(z.object({ id: z.string(), verdict: ciEnum(["fixed", "partly", "still_there"]), explanation: z.string() }))
     .nullish(),
-  dropOff: z.object({ quote: z.string().min(3), why: z.string().min(1) }).nullish(),
+  // Optional and never worth failing a whole read over.
+  dropOff: z.object({ quote: z.string(), why: z.string().min(1) }).nullish().catch(null),
 });
 
 export type ChapterFeedback = z.infer<typeof ChapterFeedbackSchema>;

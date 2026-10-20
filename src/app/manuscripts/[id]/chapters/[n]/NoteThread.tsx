@@ -111,7 +111,7 @@ export function NoteThread({ noteId }: { noteId: string }) {
               {streaming ? "…" : "Ask"}
             </button>
           </form>
-          <p className="mt-1.5 text-[0.7rem] text-muted">The reader explains and re-checks its note. It won’t write the fix for you.</p>
+          <p className="mt-1.5 text-[0.7rem] text-muted">The reader explains and re-checks its note. It won’t write the fix for you. Re-reading the chapter replaces its notes, and this conversation with them.</p>
         </>
       )}
     </div>

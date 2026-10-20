@@ -131,8 +131,8 @@ export default async function ReaderMapPage({ params }: { params: Promise<{ id: 
                 <div className="min-w-0 text-sm sm:pt-0.5">
                   {r.dropOff ? (
                     <>
-                      <p className="font-serif italic text-ink">“{r.dropOff.quote}”</p>
-                      <p className="mt-1 text-muted">{r.dropOff.why}</p>
+                      {r.dropOff.quote && <p className="font-serif italic text-ink">“{r.dropOff.quote}”</p>}
+                      <p className={r.dropOff.quote ? "mt-1 text-muted" : "text-muted"}>{r.dropOff.why}</p>
                     </>
                   ) : (
                     r.tracked &&

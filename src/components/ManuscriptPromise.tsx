@@ -11,8 +11,9 @@ export const PROMISE: [string, React.ReactNode][] = [
   ["Never used to train AI.", <>Your book is read by Claude, made by Anthropic, whose <a href={MODEL_TERMS_URL} className="underline hover:text-ink" target="_blank" rel="noreferrer">commercial terms</a> forbid training its models on what we send. {BRAND.name} doesn’t train anything on it either.</>],
   ["Private to you.", "Manuscripts, notes and reports belong to your account. Nobody else can open them."],
   ["Deleted in one click.", "Delete a manuscript and its text, notes and reports are removed from your account straight away."],
-  ["Encrypted.", "Stored encrypted at rest (AES-256) and sent only over encrypted connections."],
-  ["It reads. It never writes.", "Nothing generates or rewrites your prose; the only one-click fixes are typos. The reader quotes your passage and explains what isn’t working, and the fix is yours to write."],
+  // Neon (the database host) encrypts all customer data at rest with AES-256: neon.com/docs/security/security-overview
+  ["Encrypted.", "Stored encrypted at rest (AES-256) by our database host, and sent only over encrypted connections."],
+  ["It reads. It never writes.", "Nothing generates or rewrites your prose; the only one-click fixes are small spelling, grammar and punctuation corrections. The reader quotes your passage and explains what isn’t working, and the fix is yours to write."],
 ];
 
 export function ManuscriptPromise({ className = "" }: { className?: string }) {

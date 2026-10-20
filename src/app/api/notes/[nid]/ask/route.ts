@@ -20,7 +20,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ nid: st
   const { nid } = await params;
   const note = await db.note.findFirst({ where: { id: nid, review: { chapter: { manuscript: { userId } } } }, select: { id: true } });
   if (!note) return new Response("Not found", { status: 404 });
-  const conversation = await db.conversation.findFirst({ where: { noteId: note.id }, select: { id: true } });
+  const conversation = await db.conversation.findUnique({ where: { noteId: note.id }, select: { id: true } });
   const messages = conversation
     ? await db.message.findMany({ where: { conversationId: conversation.id }, orderBy: { createdAt: "asc" }, select: { id: true, role: true, content: true } })
     : [];
@@ -55,11 +55,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ nid: st
   let prepared;
   try {
     prepared = await (async () => {
-      const conversation =
-        (await db.conversation.findFirst({ where: { noteId: note.id } })) ??
-        (await db.conversation.create({
-          data: { manuscriptId, chapterId: note.review.chapter.id, noteId: note.id, title: message.slice(0, 80) },
-        }));
+      // One conversation per note (noteId is unique), so two quick sends can't make two.
+      const conversation = await db.conversation.upsert({
+        where: { noteId: note.id },
+        update: {},
+        create: { manuscriptId, chapterId: note.review.chapter.id, noteId: note.id, title: message.slice(0, 80) },
+      });
 
       // Most recent 30 messages, oldest first, starting on a user turn.
       const history = (await db.message.findMany({ where: { conversationId: conversation.id }, orderBy: { createdAt: "desc" }, take: 30 })).reverse();

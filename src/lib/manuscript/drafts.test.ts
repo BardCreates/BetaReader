@@ -71,3 +71,19 @@ test("checkedLine", () => {
   assert.equal(checkedLine([{ verdict: "fixed" }]), "1 of 1 earlier issue fixed");
   assert.equal(checkedLine([{ verdict: "fixed" }, { verdict: "partly" }]), "1 of 2 earlier issues fixed");
 });
+
+test("with the import summary, only chapters the draft changed or added are compared or waited on", () => {
+  const result = compareDraft(
+    2,
+    [
+      { number: 1, title: "One", stale: false, review: review({ engagement: 7 }) }, // first read now, but untouched by the import
+      { number: 2, title: "Two", stale: false, review: null }, // never read, untouched
+      { number: 3, title: "Three", stale: false, review: review({ revisionCheck: { previousEngagement: 6, notes: [], unchecked: true } }) },
+      { number: 4, title: "Four", stale: false, review: null }, // added, not read yet
+    ],
+    { changed: ["Three"], added: ["Four"], removed: [], unchanged: 2 },
+  );
+  assert.deepEqual(result.chapters.map((c) => [c.number, c.unchecked]), [[3, true]]);
+  assert.deepEqual(result.waiting, [{ number: 4, title: "Four" }]);
+  assert.equal(checkedLine([], true), "Earlier issues weren’t checked on this read");
+});

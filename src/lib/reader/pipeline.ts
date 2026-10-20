@@ -262,7 +262,7 @@ async function readChapter(args: {
       })
     )
       .slice(-MAX_BIBLE_FACTS)
-      .map((f, i) => ({ id: `F${i + 1}`, subject: f.subject, fact: f.fact, chapter: f.chapter.index + 1 }));
+      .map((f, i) => ({ id: `F${i + 1}`, subject: f.subject, fact: f.fact, chapter: f.chapter.index + 1, chapterId: f.chapterId }));
 
     const { data, usage } = await callStructured({
       system: args.system,
@@ -322,7 +322,7 @@ async function readChapter(args: {
         suggestion: c.suggestion ?? null,
         // Kept apart from the comment so the continuity ledger can show "established → contradicted".
         conflictFact: earlier?.fact ?? null,
-        conflictChapter: earlier?.chapter ?? null,
+        conflictChapterId: earlier?.chapterId ?? null,
       });
     }
     const facts: Prisma.StoryFactCreateManyInput[] = data.facts.map((f) => ({
@@ -355,14 +355,17 @@ async function readChapter(args: {
                 : [];
             }),
           }
-        : // A re-read (the chapter had a finished read before) always gets a revision check, even with
-          // no earlier issues, so the engagement change and "revised, not new" show up for drafts.
-          previousIssues.length || before?.status === "DONE"
-          ? { previousEngagement, notes: [] }
-          : null;
+        : previousIssues.length
+          ? // The model didn't report on the earlier issues: say so rather than "nothing to check".
+            { previousEngagement, notes: [], unchecked: true }
+          : // A re-read always gets a revision check, even with no earlier issues, so the engagement
+            // change and "revised, not new" show up on the drafts page.
+            before?.status === "DONE"
+            ? { previousEngagement, notes: [] }
+            : null;
     const intentCheck = chapter.intent?.trim() && data.intentCheck ? { intent: chapter.intent.trim(), ...data.intentCheck } : null;
-    // Only keep a drop-off point we can find on the page; a paraphrase can't be shown on the reader map.
-    const dropOff = data.dropOff && findQuote(text, data.dropOff.quote, 0) ? { quote: data.dropOff.quote, why: data.dropOff.why } : null;
+    // Keep the quote only if it's on the page (a paraphrase can't be shown as the author's words); keep the dip either way.
+    const dropOff = data.dropOff ? { quote: findQuote(text, data.dropOff.quote, 0) ? data.dropOff.quote : null, why: data.dropOff.why } : null;
     const draft = (await db.manuscript.findUnique({ where: { id: chapter.manuscriptId }, select: { draft: true } }))?.draft ?? null;
 
     await db.$transaction([

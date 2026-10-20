@@ -295,7 +295,7 @@ const FAQ: [string, string][] = [
   ],
   [
     "Will it rewrite my book?",
-    "No. Beyond one-click typo fixes, nothing writes for you. The reader quotes your passage, explains what isn’t working and how you might approach it, and the words stay yours. You can argue with any note, and it re-checks the page.",
+    "No. Beyond small one-click spelling, grammar and punctuation fixes, nothing writes for you. The reader quotes your passage, explains what isn’t working and how you might approach it, and the words stay yours. You can argue with any note, and it re-checks the page.",
   ],
   [
     "Is this a replacement for human beta readers or an editor?",

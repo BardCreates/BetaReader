@@ -28,6 +28,8 @@ export default async function EditorPage({
       title: true,
       chapters: { orderBy: { index: "asc" }, select: { id: true, index: true, title: true } },
       conversations: {
+        // Editor conversations only: not character interviews or questions about a note.
+        where: { characterId: null, noteId: null },
         orderBy: { updatedAt: "desc" },
         take: 30,
         select: { id: true, title: true, chapterId: true, updatedAt: true },
@@ -39,7 +41,7 @@ export default async function EditorPage({
   const current = sp.c
     ? (ms.conversations.find((c) => c.id === sp.c) ??
       (await db.conversation.findFirst({
-        where: { id: sp.c, manuscriptId: ms.id },
+        where: { id: sp.c, manuscriptId: ms.id, characterId: null, noteId: null },
         select: { id: true, title: true, chapterId: true, updatedAt: true },
       })) ??
       undefined)

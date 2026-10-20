@@ -71,9 +71,9 @@ export default async function DraftChangesPage({ params }: { params: Promise<{ i
         : null,
     };
   });
-  const cmp = compareDraft(ms.draft, inputs);
   const latest = ms.drafts.find((d) => d.number === ms.draft);
   const imported = latest ? parseDraftSummary(latest.summary) : null;
+  const cmp = compareDraft(ms.draft, inputs, imported);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-8 lg:px-12">
@@ -163,7 +163,7 @@ export default async function DraftChangesPage({ params }: { params: Promise<{ i
                     <Link href={`${base}/chapters/${c.number}`} className="font-serif text-lg font-semibold hover:text-accent">
                       {c.number}. {c.title}
                     </Link>
-                    <span className="text-sm text-muted">{c.kind === "revised" ? checkedLine(c.checked) : "New in this draft"}</span>
+                    <span className="text-sm text-muted">{c.kind === "revised" ? checkedLine(c.checked, c.unchecked) : "New in this draft"}</span>
                     {c.after != null && (
                       <span className="ml-auto text-sm text-muted">
                         {c.before != null ? (

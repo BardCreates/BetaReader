@@ -5,7 +5,8 @@ import { dropPoints, parseDropOff } from "./dropOff";
 test("parseDropOff accepts a stored drop-off and rejects anything else", () => {
   assert.deepEqual(parseDropOff({ quote: "The council met.", why: "We know the vote." }), { quote: "The council met.", why: "We know the vote." });
   assert.equal(parseDropOff(null), null);
-  assert.equal(parseDropOff({ quote: "", why: "x" }), null);
+  // A dip whose passage couldn't be found on the page keeps its reason, without a quote.
+  assert.deepEqual(parseDropOff({ quote: null, why: "Lost the thread." }), { quote: null, why: "Lost the thread." });
   assert.equal(parseDropOff({ quote: "x" }), null);
 });
 

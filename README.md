@@ -125,4 +125,4 @@ Plans are matched to subscriptions by price id, so changing a price in Stripe on
 - **More formats.** PDF and EPUB import; Scrivener via .docx export works today.
 - **Export.** Download the report and notes as .docx/PDF.
 - **Comparisons.** Show how engagement changed between reads after a revision.
-- **Privacy.** Manuscripts are private per account. Before launch: a privacy policy stating manuscripts aren't used for training, data deletion, and encryption at rest from your database host.
+- **Privacy.** Manuscripts are private per account, and the pricing page states the manuscript promise (`src/components/ManuscriptPromise.tsx`): not used for training (Anthropic's commercial terms), one-click delete, encrypted at rest by Neon (AES-256). Before launch: a privacy policy that matches it, including how long backups keep deleted data.

@@ -41,7 +41,7 @@ export default async function StoryBiblePage({ params }: { params: Promise<{ id:
       suggestion: true,
       status: true,
       conflictFact: true,
-      conflictChapter: true,
+      conflictChapter: { select: { index: true } },
       review: { select: { chapter: { select: { index: true, title: true } } } },
     },
   });
@@ -91,8 +91,8 @@ export default async function StoryBiblePage({ params }: { params: Promise<{ id:
                         <>
                           <dt className="text-muted">
                             Established in{" "}
-                            <Link href={`${base}/chapters/${i.conflictChapter}`} className="underline hover:text-ink">
-                              ch. {i.conflictChapter}
+                            <Link href={`${base}/chapters/${i.conflictChapter.index + 1}`} className="underline hover:text-ink">
+                              ch. {i.conflictChapter.index + 1}
                             </Link>
                           </dt>
                           <dd>{i.conflictFact}</dd>

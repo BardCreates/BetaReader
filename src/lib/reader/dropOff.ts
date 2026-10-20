@@ -1,10 +1,14 @@
-/** Where the reader's attention dipped most in a chapter (`ChapterReview.dropOff`). */
-export type DropOff = { quote: string; why: string };
+/**
+ * Where the reader's attention dipped most in a chapter (`ChapterReview.dropOff`). `quote` is null
+ * when the passage the reader named couldn't be found on the page.
+ */
+export type DropOff = { quote: string | null; why: string };
 
 export function parseDropOff(value: unknown): DropOff | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
-  return typeof v.quote === "string" && typeof v.why === "string" && v.quote.trim() ? { quote: v.quote, why: v.why } : null;
+  if (typeof v.why !== "string" || !v.why.trim()) return null;
+  return { quote: typeof v.quote === "string" && v.quote.trim() ? v.quote : null, why: v.why };
 }
 
 /**
