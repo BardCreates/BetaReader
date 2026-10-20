@@ -26,7 +26,7 @@ export default async function Home() {
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted">
               {BRAND.name} reads your book chapter by chapter, the way a real reader would. It tells you where it was hooked, where it drifted,
-              what it guessed too early, and how to fix what isn’t working.
+              what it guessed too early, and how to fix what isn’t working. And when you’re stuck, you can ask your characters.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link href={start} className={`${buttonClass} px-5 py-2.5 text-base`}>
@@ -99,15 +99,45 @@ export default async function Home() {
           </div>
         </section>
 
+        {/* Character chat: a headline feature of its own. */}
+        <section className="border-t border-line">
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 sm:px-8 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+            <div>
+              <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Talk with your characters.</h2>
+              <p className="mt-4 text-lg leading-relaxed text-muted">
+                Stuck on a scene? Not sure why she’d say that? Ask her. Your characters answer in their own voice, drawing on every page they appear
+                on, so you can interview them, test a scene before you write it, or find the backstory you haven’t figured out yet.
+              </p>
+              <ul className="mt-7 space-y-4">
+                {[
+                  ["They stay true to your book.", "Each character knows the passages they’re in and the profile you’ve written, and won’t contradict the page."],
+                  ["You can see what’s new.", "Anything they invent beyond your manuscript is highlighted, so you always know canon from brainstorm."],
+                  ["Meet them at any point in the story.", "Limit what they know to a chapter and talk to who they were back then."],
+                  ["Keep what’s useful.", "Save a good answer to their profile in one click, and it becomes part of who they are."],
+                ].map(([t, d]) => (
+                  <li key={t} className="border-l-2 border-line pl-4">
+                    <span className="font-semibold">{t}</span> <span className="text-muted">{d}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href={start} className={`${buttonClass} mt-8 px-5 py-2.5`}>
+                {signedIn ? "Talk to your characters" : "Meet your characters"}
+              </Link>
+            </div>
+            <ChatDemo />
+          </div>
+        </section>
+
         {/* Everything else in the box. */}
-        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-8">
+        <section className="border-t border-line bg-card/60">
+          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-8">
           <h2 className="max-w-2xl font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Everything a first read should give you</h2>
           <div className="mt-10 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
             {[
               ["An editorial letter", "A developmental read of the whole book: what it is, what’s working, and the biggest opportunities in priority order, with a revision plan."],
               ["Notes on the page", "Reactions, praise and problems anchored to the exact passage, each problem with a concrete way to fix it. Mark them fixed as you go."],
               ["A story bible", "The facts your book establishes, gathered as it reads: who’s who, injuries, ages, places, timeline and the rules of your world."],
-              ["Talk to your characters", "Ask them about scenes you haven’t written yet, in their own voice, grounded in the pages they appear on. Anything they invent is marked."],
+              ["Three kinds of reader", "Choose a devoted genre reader, a developmental editor for structure and stakes, or a line editor for voice and prose."],
               ["A pitch kit", "A logline, back-cover blurb, synopsis and query letter drafted from how the book actually read, plus what made it hard to pitch."],
               ["A place to write", "A clean editor with your chapters in a book outline, the reader’s notes beside the text, and grammar and style suggestions when you want them."],
             ].map(([t, d]) => (
@@ -117,10 +147,11 @@ export default async function Home() {
               </div>
             ))}
           </div>
+          </div>
         </section>
 
         {/* Fits how authors already work. */}
-        <section className="border-t border-line bg-card/60">
+        <section className="border-t border-line">
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-20 sm:px-8 md:grid-cols-2">
             <div>
               <h2 className="font-serif text-3xl leading-tight font-semibold">Keep writing where you write.</h2>
@@ -224,6 +255,10 @@ const FAQ: [string, string][] = [
     "Not while it reads. Like a real reader, it only knows the chapters it has read so far, which is how it can tell you what you gave away too early and what never paid off.",
   ],
   [
+    "How does talking with my characters work?",
+    "Open a character (Readthrough finds them in your manuscript, or you add them) and ask them anything. They answer in their own voice from the pages they appear on and the profile you’ve written, mark anything they invent, and can be limited to what they knew at a given chapter. Start a message with “OOC:” to step outside the story and talk about them as a writer.",
+  ],
+  [
     "Which files can I upload?",
     "Word (.docx), plain text and Markdown, or paste text in. From Dabble, Scrivener or Google Docs, export a .docx. Start each chapter with a heading like “Chapter 1” so it splits cleanly.",
   ],
@@ -236,6 +271,39 @@ const FAQ: [string, string][] = [
     "Yes, any time, from your account. You’re never charged more than your plan’s price.",
   ],
 ];
+
+/** A short conversation with a character, as the chat shows it. Example content. */
+function ChatDemo() {
+  return (
+    <figure>
+      <div className="rounded-2xl border border-line bg-card shadow-[0_12px_40px_-12px_rgb(22_29_46/0.18)]" aria-label="Example conversation with a character">
+        <div className="flex items-center gap-3 border-b border-line px-5 py-3.5">
+          <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-pen-soft font-serif text-sm font-semibold text-pen">
+            MH
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-serif font-semibold leading-tight">Mara Holt</p>
+            <p className="text-xs text-muted">she/her, protagonist</p>
+          </div>
+          <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-muted">Knows up to chapter 6</span>
+        </div>
+        <div className="space-y-4 px-5 py-5 text-[0.95rem]">
+          <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5">Why haven’t you opened the letter?</p>
+          <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-line px-4 py-3 font-serif leading-relaxed">
+            Because I know her handwriting. Eleven years of nothing, and now this, on our kitchen table like it belongs there.{" "}
+            <mark className="invented">The morning she left, she put a note under the sugar tin.</mark> I’ve never told Tom I kept it. If I open this
+            one, I have to decide whether she gets to come back.
+            <p className="mt-2 font-sans text-xs text-muted">Save to notes</p>
+          </div>
+          <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5">What would make you open it?</p>
+        </div>
+      </div>
+      <figcaption className="mt-3 text-center text-sm text-muted">
+        Example conversation. <mark className="invented">Highlighted</mark> details are invented, not from the manuscript.
+      </figcaption>
+    </figure>
+  );
+}
 
 /** Re-importing a revised draft, as the preview shows it. */
 function UpdateDemo() {
