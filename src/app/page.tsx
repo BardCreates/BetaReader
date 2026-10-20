@@ -50,7 +50,7 @@ export default async function Home() {
               {[
                 [
                   "Upload your draft",
-                  "Export a .docx from Dabble, Word, Scrivener or Google Docs, or paste it in. Your chapter headings split it into chapters.",
+                  "Export from Dabble (Word or Markdown), Word, Scrivener or Google Docs, or paste it in. Your chapter headings become chapters, and scene breaks come with them.",
                 ],
                 [
                   "It reads, in order",
@@ -305,7 +305,7 @@ const FAQ: [string, string][] = [
   ],
   [
     "Which files can I upload?",
-    "Word (.docx), plain text and Markdown, or paste text in. From Dabble, Scrivener or Google Docs, export a .docx. Start each chapter with a heading like “Chapter 1” so it splits cleanly.",
+    "Word (.docx), Markdown and plain text, or paste text in. From Dabble, export to Word or Markdown: chapters come across as they are in Dabble, the title page is left out and scene separators become scene breaks. From Scrivener or Google Docs, export a .docx. Files without heading styles split on lines like “Chapter 1”.",
   ],
   [
     "How long does a read take?",

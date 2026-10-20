@@ -7,10 +7,10 @@ import { z } from "zod";
 import { requireUser, signOut } from "@/auth";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { extractText } from "@/lib/manuscript/import";
+import { fromText, importFile, type ImportedManuscript } from "@/lib/manuscript/import";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { docToPlain, plainToDoc, sanitizeDoc } from "@/lib/manuscript/doc";
-import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
+import { countWords } from "@/lib/manuscript/split";
 import { getUsage, isLimitError, release, reserve, type Reservation } from "@/lib/billing/usage";
 import { remaining } from "@/lib/billing/period";
 import { planFor } from "@/lib/plans";
@@ -42,17 +42,17 @@ export async function createManuscript(_prev: FormState, form: FormData): Promis
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
 
-  let raw = parsed.data.text ?? "";
+  let imported: ImportedManuscript = fromText(parsed.data.text ?? "");
   const file = form.get("file");
   if (file instanceof File && file.size > 0) {
     try {
-      raw = await extractText(file);
+      imported = await importFile(file);
     } catch (err) {
       return { error: err instanceof Error ? err.message : "Couldn't read that file." };
     }
   }
-  const chapters = splitIntoChapters(raw);
-  const wordCount = countWords(raw);
+  const chapters = imported.chapters;
+  const wordCount = chapters.reduce((n, c) => n + c.wordCount, 0);
   if (!chapters.length || wordCount < 100) return { error: "Paste or upload at least a few pages (100+ words)." };
 
   const account = await db.user.findUniqueOrThrow({

@@ -74,7 +74,7 @@ export function NewManuscriptForm({ personas }: { personas: { id: string; label:
           ))}
         </div>
         {mode === "file" ? (
-          <FileDrop accept=".docx,.txt,.md,.markdown" hint=".docx, .txt or .md, up to 10 MB. From Dabble, Scrivener or Google Docs, export a .docx." />
+          <FileDrop accept=".docx,.txt,.md,.markdown" hint=".docx, .md or .txt, up to 10 MB. From Dabble, export to Word or Markdown and your chapters come straight across. From Scrivener or Google Docs, export a .docx." />
         ) : (
           <Field label="Manuscript text" hint="Start each chapter with a heading line like “Chapter 1” so we can split it.">
             <textarea name="text" rows={14} required className={`${inputClass} font-serif`} />

@@ -8,9 +8,9 @@ import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { plainToDoc } from "@/lib/manuscript/doc";
-import { extractText } from "@/lib/manuscript/import";
+import { fromText, importFile } from "@/lib/manuscript/import";
 import { canonicalText, matchChapters, summarizeChanges, type ChapterChange } from "@/lib/manuscript/match";
-import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
+import { countWords } from "@/lib/manuscript/split";
 import { planFor } from "@/lib/plans";
 import { remaining } from "@/lib/billing/period";
 import { getUsage } from "@/lib/billing/usage";
@@ -27,11 +27,11 @@ export type ReimportPreview = {
 };
 export type ReimportState = { error?: string; preview?: ReimportPreview } | undefined;
 
-async function readUpload(form: FormData): Promise<string> {
+async function readUpload(form: FormData) {
   const file = form.get("file");
-  if (file instanceof File && file.size > 0) return extractText(file);
+  if (file instanceof File && file.size > 0) return importFile(file);
   const text = form.get("text");
-  return typeof text === "string" ? text : "";
+  return fromText(typeof text === "string" ? text : "");
 }
 
 /**
@@ -56,13 +56,13 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
     return { error: "The reader is partway through this book. Update the draft when the read finishes." };
   }
 
-  let raw: string;
+  let upload: Awaited<ReturnType<typeof readUpload>>;
   try {
-    raw = await readUpload(form);
+    upload = await readUpload(form);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Couldn't read that file." };
   }
-  const incoming = splitIntoChapters(raw);
+  const incoming = upload.chapters;
   // Same measure as the manuscript's stored total: chapter text only, headings excluded.
   const words = incoming.reduce((sum, c) => sum + countWords(canonicalText(c.content)), 0);
   if (!incoming.length || words < 100) return { error: "That file looks empty. Upload the full draft (100+ words)." };
