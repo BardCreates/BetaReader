@@ -48,6 +48,9 @@ export function Sidebar({ email, data }: { email: string | null; data: SidebarDa
             <NavLink href={`${base}/journey`} active={pathname === `${base}/journey`}>
               Reader journey
             </NavLink>
+            <NavLink href={`${base}/drafts`} active={pathname === `${base}/drafts`}>
+              Draft comparison
+            </NavLink>
             <NavLink href={`${base}/bible`} active={pathname === `${base}/bible`}>
               Story bible
               {ms.continuityIssues > 0 && (

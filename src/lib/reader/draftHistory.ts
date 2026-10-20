@@ -1,0 +1,63 @@
+import "server-only";
+import { db } from "@/lib/db";
+import { snapshotChapter, type SnapshotData } from "./drafts";
+
+/** How the read of a manuscript stands right now, in the form kept for draft comparisons. */
+export async function currentSnapshot(manuscriptId: string): Promise<SnapshotData | null> {
+  const ms = await db.manuscript.findUnique({
+    where: { id: manuscriptId },
+    select: {
+      draft: true,
+      wordCount: true,
+      report: { select: { status: true, content: true } },
+      _count: { select: { facts: true } },
+      chapters: {
+        orderBy: { index: "asc" },
+        select: {
+          id: true,
+          index: true,
+          title: true,
+          wordCount: true,
+          contentUpdatedAt: true,
+          review: {
+            select: {
+              status: true,
+              readAt: true,
+              updatedAt: true,
+              engagement: true,
+              confusion: true,
+              revisionCheck: true,
+              notes: {
+                where: { kind: "ISSUE" },
+                orderBy: { startOffset: "asc" },
+                select: { kind: true, category: true, severity: true, quote: true, comment: true, status: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!ms) return null;
+  const unanswered = await db.readerThread.count({ where: { manuscriptId, kind: "QUESTION", outcome: "OPEN" } });
+  const report = ms.report?.status === "DONE" ? (ms.report.content as { headline?: string } | null) : null;
+  return {
+    version: 1,
+    draft: ms.draft,
+    wordCount: ms.wordCount,
+    chapters: ms.chapters.map(snapshotChapter),
+    facts: ms._count.facts,
+    unanswered,
+    headline: report?.headline ?? null,
+  };
+}
+
+/**
+ * Keep how the read stands before it's replaced (a revised draft coming in, or a fresh read
+ * starting over). Skipped when nothing has been read yet, since there'd be nothing to compare.
+ */
+export async function keepSnapshot(manuscriptId: string, reason: "reimport" | "fresh_read") {
+  const data = await currentSnapshot(manuscriptId);
+  if (!data || !data.chapters.some((c) => c.read || c.stale)) return null;
+  return db.draftSnapshot.create({ data: { manuscriptId, draft: data.draft, reason, data } });
+}

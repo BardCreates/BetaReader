@@ -14,6 +14,7 @@ import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
 import { planFor } from "@/lib/plans";
 import { remaining } from "@/lib/billing/period";
 import { getUsage } from "@/lib/billing/usage";
+import { keepSnapshot } from "@/lib/reader/draftHistory";
 import { MIN_WORDS_TO_READ, claimManuscript, readManuscript } from "@/lib/reader/pipeline";
 
 export type ReimportPreview = {
@@ -85,6 +86,9 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
     };
   }
 
+  // Keep how the read of this draft stood, so the next read can be compared with it.
+  await keepSnapshot(ms.id, "reimport");
+
   const now = new Date();
   const byId = new Map(ms.chapters.map((c) => [c.id, c]));
   const ops: Prisma.PrismaPromise<unknown>[] = [];
@@ -147,7 +151,7 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
     );
   }
 
-  ops.push(db.manuscript.update({ where: { id: ms.id }, data: { wordCount: words } }));
+  ops.push(db.manuscript.update({ where: { id: ms.id }, data: { wordCount: words, draft: { increment: 1 } } }));
   await db.$transaction(ops);
 
   revalidatePath(`/manuscripts/${ms.id}`, "layout");

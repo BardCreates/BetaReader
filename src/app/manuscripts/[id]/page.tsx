@@ -138,7 +138,12 @@ export default async function ManuscriptPage({
           </Card>
         )}
         {justUpdated && !showReadChanges && !busy && (
-          <Card className="mt-6 text-sm text-muted">Draft updated.</Card>
+          <Card className="mt-6 text-sm text-muted">
+            Draft updated.{" "}
+            <Link href={`${base}/drafts`} className="text-accent hover:underline">
+              Compare with the last draft
+            </Link>
+          </Card>
         )}
         {stale && (
           <Card className="mt-6 border-danger/40 bg-danger-soft/60 text-sm text-danger">
@@ -215,6 +220,11 @@ export default async function ManuscriptPage({
                   />
                 )}
                 <Tool href={`${base}/update`} title="Update from new draft" detail="Upload a fresh export from Dabble or Word" />
+                <Tool
+                  href={`${base}/drafts`}
+                  title="Draft comparison"
+                  detail={ms.draft > 1 ? `Draft ${ms.draft} against the last one` : "After you bring in a revised draft"}
+                />
               </ul>
             </Card>
             <form action={deleteManuscript.bind(null, ms.id)} className="px-1">

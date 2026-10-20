@@ -16,6 +16,7 @@ import { remaining } from "@/lib/billing/period";
 import { planFor } from "@/lib/plans";
 import { PERSONAS } from "@/lib/reader/personas";
 import { lineEditText, type LineSuggestion } from "@/lib/reader/lineEdit";
+import { keepSnapshot } from "@/lib/reader/draftHistory";
 import { MIN_WORDS_TO_READ, claimManuscript, readManuscript, rereadChapter } from "@/lib/reader/pipeline";
 
 export type FormState = { error?: string } | undefined;
@@ -90,6 +91,8 @@ export async function startReading(manuscriptId: string, fresh = false) {
   if (claim === "claimed") {
     if (fresh) {
       // Start over: a new read from chapter 1 with no memory of the previous read.
+      // Keep the old read first so the new one can be compared with it.
+      await keepSnapshot(manuscriptId, "fresh_read");
       await db.$transaction([
         db.chapterReview.deleteMany({ where: { chapter: { manuscriptId } } }),
         db.bookReport.deleteMany({ where: { manuscriptId } }),
