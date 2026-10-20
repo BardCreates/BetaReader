@@ -23,7 +23,7 @@ export default async function UpdateDraftPage({ params }: { params: Promise<{ id
         show you what changed, and keep the reader’s notes on everything you didn’t touch. Afterwards the reader only needs to read
         the chapters that changed.
       </p>
-      <p className="mt-2 text-sm text-muted">From Dabble, export the book as a Word (.docx) file.</p>
+      <p className="mt-2 text-sm text-muted">From Dabble, export the whole book to Word (.docx) or Markdown, the same way as last time. Chapters are matched by their text and titles, so renamed, added and reordered chapters line up.</p>
       <UpdateDraftForm manuscriptId={ms.id} />
     </main>
   );

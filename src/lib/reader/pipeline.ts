@@ -70,15 +70,16 @@ export function isStale(status: string, updatedAt: Date) {
  * re-running after a failure picks up where it stopped. With `rereadChanged`, chapters
  * edited since their read are read again too (the "read changes" flow after a revision).
  *
- * NOTE: this runs in-process (via `after()`). For production at scale move it to a
- * durable job runner (Inngest, Trigger.dev, a queue + worker) — see README.
+ * Runs as a background job (src/lib/jobs): queued by the web app, run by a worker, and retried
+ * if the worker dies. Safe to run again at any point.
  */
-export async function readManuscript(manuscriptId: string, opts: { rereadChanged?: boolean } = {}) {
+export async function readManuscript(manuscriptId: string, opts: { rereadChanged?: boolean; signal?: AbortSignal } = {}) {
   const ms = await db.manuscript.findUnique({
     where: { id: manuscriptId },
     include: { chapters: { orderBy: { index: "asc" }, select: { id: true } } },
   });
   if (!ms) return;
+  await settleOpenReservation(ms.id, ms.openReservation);
 
   await db.manuscript.update({ where: { id: ms.id }, data: { status: "READING" } });
 
@@ -99,6 +100,8 @@ export async function readManuscript(manuscriptId: string, opts: { rereadChanged
   try {
     let memory: string | null = null;
     for (const { id } of ms.chapters) {
+      // Another worker took this read over (this one stalled): leave it to them, change nothing.
+      if (opts.signal?.aborted) return;
       // Re-fetch each chapter so the read always uses its latest text and review state.
       const chapter = await db.chapter.findUnique({ where: { id }, include: { review: true } });
       if (!chapter) throw new Error("A chapter was removed during the read.");
@@ -110,16 +113,25 @@ export async function readManuscript(manuscriptId: string, opts: { rereadChanged
       if (chapter.wordCount < MIN_WORDS_TO_READ) continue; // nothing to read yet
       // Take the chapter's words from the allowance first; stops the read cleanly at the limit.
       reservation = await reserve(ms.userId, "words", chapter.wordCount);
-      // Heartbeat so a dead read can be detected and resumed (see claimManuscript).
-      await db.manuscript.update({ where: { id: ms.id }, data: { updatedAt: new Date() } });
+      // Heartbeat so a dead read can be detected and resumed (see claimManuscript), and note the
+      // reservation so it can be given back if the worker dies mid-chapter.
+      await db.manuscript.update({
+        where: { id: ms.id },
+        data: { updatedAt: new Date(), openReservation: { ...reservation, periodStart: reservation.periodStart.toISOString(), chapterId: chapter.id } },
+      });
       memory = await readChapter({ system, chapter, total: ms.chapters.length, memory, meter });
       reservation = null;
-      await db.user.update({ where: { id: ms.userId }, data: { wordsReadTotal: { increment: chapter.wordCount } } });
+      await db.$transaction([
+        db.manuscript.update({ where: { id: ms.id }, data: { openReservation: Prisma.DbNull } }),
+        db.user.update({ where: { id: ms.userId }, data: { wordsReadTotal: { increment: chapter.wordCount } } }),
+      ]);
     }
+    if (opts.signal?.aborted) return;
     await writeBookReport(ms.id, ctx, meter);
     await db.manuscript.update({ where: { id: ms.id }, data: { status: "DONE" } });
   } catch (err) {
     await release(reservation).catch(() => {});
+    await db.manuscript.updateMany({ where: { id: ms.id }, data: { openReservation: Prisma.DbNull } }).catch(() => {});
     const message = err instanceof Error ? err.message : String(err);
     // updateMany: the manuscript may have been deleted mid-read.
     await db.manuscript.updateMany({
@@ -127,6 +139,20 @@ export async function readManuscript(manuscriptId: string, opts: { rereadChanged
       data: { status: "ERROR", error: message, errorCode: isLimitError(err) ? err.code : null },
     });
   }
+}
+
+/**
+ * A previous run of this read died mid-chapter with words reserved: give them back, unless that
+ * chapter's read actually finished (then they were spent).
+ */
+async function settleOpenReservation(manuscriptId: string, open: unknown) {
+  if (!open || typeof open !== "object") return;
+  const r = open as Reservation & { periodStart: string | Date; chapterId?: string };
+  const finished = r.chapterId
+    ? (await db.chapterReview.findUnique({ where: { chapterId: r.chapterId }, select: { status: true } }))?.status === "DONE"
+    : false;
+  if (!finished) await release({ ...r, periodStart: new Date(r.periodStart) }).catch((e) => console.error("release open reservation", e));
+  await db.manuscript.updateMany({ where: { id: manuscriptId }, data: { openReservation: Prisma.DbNull } });
 }
 
 /**
@@ -376,6 +402,9 @@ async function readChapter(args: {
           reaction: data.reaction,
           summary: data.summary,
           engagement: data.engagement,
+          confusion: data.confusion ?? null,
+          driftQuote: data.driftPoint?.quote ?? null,
+          driftReason: data.driftPoint?.reason ?? null,
           strengths: data.strengths,
           questions: data.questions,
           predictions: data.predictions,

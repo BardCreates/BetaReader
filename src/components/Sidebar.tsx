@@ -42,8 +42,14 @@ export function Sidebar({ email, data }: { email: string | null; data: SidebarDa
               Overview &amp; report
               {ms.reading && <Dot state="reading" />}
             </NavLink>
+            <NavLink href={`${base}/dropoff`} active={pathname === `${base}/dropoff`}>
+              Drop-off map
+            </NavLink>
             <NavLink href={`${base}/journey`} active={pathname === `${base}/journey`}>
               Reader journey
+            </NavLink>
+            <NavLink href={`${base}/drafts`} active={pathname === `${base}/drafts`}>
+              Draft comparison
             </NavLink>
             <NavLink href={`${base}/bible`} active={pathname === `${base}/bible`}>
               Story bible
@@ -58,9 +64,11 @@ export function Sidebar({ email, data }: { email: string | null; data: SidebarDa
                 Characters
               </NavLink>
             )}
-            <NavLink href={`${base}/pitch`} active={pathname === `${base}/pitch`}>
-              Pitch kit
-            </NavLink>
+            {FEATURES.pitchKit && (
+              <NavLink href={`${base}/pitch`} active={pathname === `${base}/pitch`}>
+                Pitch kit
+              </NavLink>
+            )}
             <Divider />
             <p className="flex items-baseline justify-between px-2.5 pb-1 text-xs font-medium text-muted">
               Chapters <span className="tabular-nums">{ms.chapters.length}</span>

@@ -138,7 +138,12 @@ export default async function ManuscriptPage({
           </Card>
         )}
         {justUpdated && !showReadChanges && !busy && (
-          <Card className="mt-6 text-sm text-muted">Draft updated.</Card>
+          <Card className="mt-6 text-sm text-muted">
+            Draft updated.{" "}
+            <Link href={`${base}/drafts`} className="text-accent hover:underline">
+              Compare with the last draft
+            </Link>
+          </Card>
         )}
         {stale && (
           <Card className="mt-6 border-danger/40 bg-danger-soft/60 text-sm text-danger">
@@ -178,7 +183,12 @@ export default async function ManuscriptPage({
           <aside className="space-y-4">
             {doneCount > 0 && (
               <Card>
-                <p className="mb-3 text-sm font-medium">Engagement by chapter</p>
+                <p className="mb-3 flex items-baseline justify-between text-sm font-medium">
+                  Engagement by chapter
+                  <Link href={`${base}/dropoff`} className="text-xs font-normal text-accent hover:underline">
+                    Drop-off map
+                  </Link>
+                </p>
                 <EngagementStrip
                   values={ms.chapters.map((c) => ({
                     label: c.title,
@@ -191,6 +201,7 @@ export default async function ManuscriptPage({
             <Card className="p-2">
               <p className="px-3 pt-2 pb-1 text-sm font-medium">Your book</p>
               <ul>
+                <Tool href={`${base}/dropoff`} title="Drop-off map" detail={doneCount ? "Where a reader would stop" : "Built during a read"} />
                 <Tool href={`${base}/journey`} title="Reader journey" detail={ms._count.threads ? `${ms._count.threads} questions and predictions` : "Built during a read"} />
                 <Tool
                   href={`${base}/bible`}
@@ -201,12 +212,19 @@ export default async function ManuscriptPage({
                 {FEATURES.characterChat && (
                   <Tool href={`${base}/characters`} title="Characters" detail={ms._count.characters ? `${ms._count.characters} to talk to` : "Find them in your manuscript"} />
                 )}
-                <Tool
-                  href={`${base}/pitch`}
-                  title="Pitch kit"
-                  detail={ms.pitchKit?.status === "DONE" ? "Logline, blurb, synopsis, query" : report ? "Ready to write" : "After a full read"}
-                />
+                {FEATURES.pitchKit && (
+                  <Tool
+                    href={`${base}/pitch`}
+                    title="Pitch kit"
+                    detail={ms.pitchKit?.status === "DONE" ? "Logline, blurb, synopsis, query" : report ? "Ready to write" : "After a full read"}
+                  />
+                )}
                 <Tool href={`${base}/update`} title="Update from new draft" detail="Upload a fresh export from Dabble or Word" />
+                <Tool
+                  href={`${base}/drafts`}
+                  title="Draft comparison"
+                  detail={ms.draft > 1 ? `Draft ${ms.draft} against the last one` : "After you bring in a revised draft"}
+                />
               </ul>
             </Card>
             <form action={deleteManuscript.bind(null, ms.id)} className="px-1">

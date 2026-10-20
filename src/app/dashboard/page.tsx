@@ -42,7 +42,7 @@ export default async function Dashboard() {
             <Mark size={44} className="mx-auto" />
             <p className="mt-5 font-serif text-2xl font-semibold">Welcome to {BRAND.name}.</p>
             <p className="mx-auto mt-2 max-w-md text-muted">
-              Upload your draft as a .docx (from Dabble, Word, Scrivener or Google Docs) or paste it in. The reader starts with chapter one.
+              Upload your draft (a Word or Markdown export from Dabble, or a .docx from Word, Scrivener or Google Docs) or paste it in. The reader starts with chapter one.
             </p>
             <Link href="/manuscripts/new" className={`${buttonClass} mt-7 px-5 py-2.5`}>
               Upload your draft

@@ -47,7 +47,7 @@ export function UpdateDraftForm({ manuscriptId }: { manuscriptId: string }) {
           ))}
         </div>
         {mode === "file" ? (
-          <FileDrop accept=".docx,.txt,.md,.markdown" hint=".docx, .txt or .md, up to 10 MB. Keep your chapter headings so chapters match up." />
+          <FileDrop accept=".docx,.txt,.md,.markdown" hint=".docx, .md or .txt, up to 10 MB. Keep your chapter headings so chapters match up." />
         ) : (
           <label className="block space-y-1.5">
             <span className="text-sm font-medium">Revised manuscript text</span>

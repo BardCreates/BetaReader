@@ -107,8 +107,10 @@ model Manuscript {
   persona     String        @default("enthusiast") // see src/lib/reader/personas.ts
   wordCount   Int           @default(0)
   status      ReadingStatus @default(DRAFT)
+  draft       Int           @default(1) // which draft this is: goes up each time a revised draft is imported
   error       String?       @db.Text
   errorCode   String?       // "LIMIT" when a read paused because the plan's allowance ran out
+  openReservation Json?     // words reserved for the chapter being read; given back if the worker died mid-chapter
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -120,6 +122,7 @@ model Manuscript {
   characters    Character[]
   facts         StoryFact[]
   pitchKit      PitchKit?
+  snapshots     DraftSnapshot[]
 
   @@index([userId])
 }
@@ -156,6 +159,9 @@ model ChapterReview {
   reaction   String?       @db.Text // first-person, as-I-read reaction
   summary    String?       @db.Text // what happened, as the reader understood it
   engagement Int?          // 1–10: how much the reader wanted to keep going
+  confusion  Int?          // 1–10: how lost the reader was (1 = always clear)
+  driftQuote  String?      @db.Text // the passage where attention slipped most (drop-off map)
+  driftReason String?      @db.Text
   strengths  Json?         // string[]
   questions  Json?         // string[] — open questions the reader is carrying
   predictions Json?        // string[] — what the reader thinks will happen
@@ -305,6 +311,7 @@ model Conversation {
   chapterId    String?
   characterId  String?
   asOfChapter  Int?     // character chat: what the character knows, up to this chapter (1-based); null = whole book
+  mode         String?  // character chat: interview mode (src/lib/reader/interview.ts); null = open conversation
   title        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -350,6 +357,23 @@ model StoryFact {
   @@index([chapterId])
 }
 
+// ─── Draft history ───────────────────────────────────────────────
+
+// How the read stood for one draft, kept when a revised draft replaces it (or a fresh read
+// starts over), so the next draft's read can be compared with it. See src/lib/reader/drafts.ts.
+model DraftSnapshot {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  draft        Int      // the draft number this records
+  reason       String   // reimport | fresh_read
+  data         Json     // SnapshotData
+  createdAt    DateTime @default(now())
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+
+  @@index([manuscriptId, createdAt])
+}
+
 // ─── Pitch kit ───────────────────────────────────────────────────
 
 // Logline, blurb, synopsis and query letter, written from the reader's experience of the book.
@@ -371,9 +395,11 @@ model PitchKit {
 // ─── Billing & cost control ──────────────────────────────────────
 
 // Every AI call, with its real cost. Feeds the per-user spend ceiling and the app-wide daily budget.
+// userId is null for free sample reads (no account), and once a user deletes their account:
+// the row stays, anonymous, so the day's spend is still counted.
 model AiUsage {
   id               String   @id @default(cuid())
-  userId           String
+  userId           String?
   manuscriptId     String?
   kind             String   // read | report | grammar | chat | characters | pitch | editor
   model            String
@@ -384,7 +410,7 @@ model AiUsage {
   costMicros       Int      @default(0)
   createdAt        DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([createdAt])
@@ -395,4 +421,45 @@ model StripeEvent {
   id        String   @id // Stripe event id
   type      String
   createdAt DateTime @default(now())
+}
+
+// ─── Free sample reads ───────────────────────────────────────────
+
+// One chapter read for someone without an account (/try). Deleted after TRIAL_RETENTION_DAYS.
+model TrialRead {
+  id        String        @id @default(cuid(2)) // in a public link, so not guessable
+  ipHash    String        // salted hash of the visitor's address, for rate limits; never the address
+  title     String?
+  genre     String?
+  content   String        @db.Text
+  wordCount Int
+  midBook   Boolean       @default(false) // from partway through the book, rather than an opening
+  status    ReadingStatus @default(QUEUED)
+  error     String?       @db.Text
+  result    Json?         // see TrialResult in src/lib/trialRead.ts
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([ipHash, createdAt])
+  @@index([createdAt])
+}
+
+// ─── Background jobs ─────────────────────────────────────────────
+
+// Long-running AI work (whole-book reads, re-reads, sample reads), run by a worker so it
+// survives restarts and request time limits. See src/lib/jobs.
+model Job {
+  id        String    @id @default(cuid())
+  kind      String    // read_manuscript | reread_chapter | pitch_kit | trial_read
+  payload   Json
+  status    String    @default("queued") // queued | running | done | failed
+  attempts  Int       @default(0)
+  runAt     DateTime  @default(now())
+  lockedAt  DateTime? // heartbeat while running; a stale one means the worker died
+  lockedBy  String?
+  error     String?   @db.Text
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([status, runAt])
 }

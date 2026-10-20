@@ -161,10 +161,41 @@ async function assertCapacity() {
 
 // ─── Cost ledger ────────────────────────────────────────────────
 
-export type Meter = { userId: string; kind?: string; manuscriptId?: string | null };
+/** Who an AI call is billed to. userId null = a free sample read with no account (see src/lib/trialRead.ts). */
+export type Meter = { userId: string | null; kind?: string; manuscriptId?: string | null };
 
 /** A worst-case cost held against the spend ceiling while an AI call runs. */
-export type CostHold = { userId: string; micros: number; fromPass: number; periodStart: Date };
+export type CostHold = { userId: string | null; micros: number; fromPass: number; periodStart: Date; trialUsageId?: string };
+
+// ─── Sample reads (no account) ──────────────────────────────────
+
+/** Total AI spend on sample reads per UTC day, in dollars. */
+export function trialBudgetMicros() {
+  const usd = Number(process.env.TRIAL_DAILY_BUDGET_USD ?? "10");
+  return Number.isFinite(usd) && usd >= 0 ? Math.round(usd * 1_000_000) : 10_000_000;
+}
+
+/** Postgres advisory lock keys, so checks and writes on shared budgets happen one at a time. */
+export const LOCK_TRIAL_BUDGET = 72_011;
+export const LOCK_TRIAL_CREATE = 72_012;
+
+/**
+ * Sample reads have no account to bill, so they share one small daily budget. A hold is written
+ * as an AiUsage row at its worst-case cost straight away (under a lock, so every worker sees it)
+ * and corrected to the real cost when the call settles.
+ */
+async function holdTrialCost(micros: number): Promise<CostHold> {
+  return db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LOCK_TRIAL_BUDGET})`;
+    const since = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+    const agg = await tx.aiUsage.aggregate({ where: { userId: null, kind: "trial", createdAt: { gte: since } }, _sum: { costMicros: true } });
+    if ((agg._sum.costMicros ?? 0) + micros > trialBudgetMicros()) {
+      throw new LimitError("Free sample reads are full for today. Try again tomorrow, or sign up free to read your opening chapters now.", "CAPACITY");
+    }
+    const row = await tx.aiUsage.create({ data: { userId: null, kind: "trial", model: "pending", costMicros: micros }, select: { id: true } });
+    return { userId: null, micros, fromPass: 0, periodStart: new Date(0), trialUsageId: row.id };
+  });
+}
 
 /** Worst case for a call: every prompt character a token (well over the real ~4 chars/token is fine), full output. */
 export function estimateMicros(model: string, promptChars: number, maxTokens: number) {
@@ -175,8 +206,9 @@ export function estimateMicros(model: string, promptChars: number, maxTokens: nu
  * Hold a call's worst-case cost before making it, atomically. Concurrent calls each hold
  * their own share, so together they can't pass the ceiling. Settle with the real cost after.
  */
-export async function holdCost(userId: string, micros: number): Promise<CostHold> {
+export async function holdCost(userId: string | null, micros: number): Promise<CostHold> {
   await assertCapacity();
+  if (userId === null) return holdTrialCost(micros);
   return db.$transaction(async (tx) => {
     const u = await lockUsage(tx, userId);
     const after = applyCost(u, micros);
@@ -192,8 +224,29 @@ export async function holdCost(userId: string, micros: number): Promise<CostHold
 /** Replace a hold with the call's real cost (none if it failed before using anything), and log it. */
 export async function settleCost(hold: CostHold, meter: Meter, model: string, usage: TokenUsage | null) {
   const actual = usage ? costMicros(model, usage) : 0;
+  const holder = hold.userId;
+  if (holder === null) {
+    // Replace the held row with the real cost, or remove it if the call used nothing.
+    if (hold.trialUsageId && usage) {
+      await db.aiUsage.update({
+        where: { id: hold.trialUsageId },
+        data: {
+          model,
+          inputTokens: usage.input,
+          outputTokens: usage.output,
+          cacheReadTokens: usage.cacheRead ?? 0,
+          cacheWriteTokens: usage.cacheWrite ?? 0,
+          costMicros: actual,
+        },
+      });
+    } else if (hold.trialUsageId) {
+      await db.aiUsage.deleteMany({ where: { id: hold.trialUsageId } });
+    }
+    if (budgetCache) budgetCache.micros += actual;
+    return actual;
+  }
   await db.$transaction(async (tx) => {
-    const u = await lockUsage(tx, hold.userId);
+    const u = await lockUsage(tx, holder);
     if (usage) {
       await tx.aiUsage.create({
         data: {
@@ -211,16 +264,16 @@ export async function settleCost(hold: CostHold, meter: Meter, model: string, us
     }
     if (u.periodStart.getTime() !== hold.periodStart.getTime()) {
       // The period rolled while the call ran: the hold was wiped with it; count the real cost now.
-      if (actual) await tx.user.update({ where: { id: hold.userId }, data: applyCost(u, actual) });
+      if (actual) await tx.user.update({ where: { id: holder }, data: applyCost(u, actual) });
       return;
     }
     const delta = actual - hold.micros;
     if (delta > 0) {
-      await tx.user.update({ where: { id: hold.userId }, data: applyCost(u, delta) });
+      await tx.user.update({ where: { id: holder }, data: applyCost(u, delta) });
     } else if (delta < 0) {
       const refund = -delta;
       await tx.user.update({
-        where: { id: hold.userId },
+        where: { id: holder },
         data: { costMicros: Math.max(0, u.costMicros - refund), passCostMicros: u.passCostMicros + Math.min(refund, hold.fromPass) },
       });
     }
@@ -232,8 +285,10 @@ export async function settleCost(hold: CostHold, meter: Meter, model: string, us
 /** Log an AI call with its real cost and count it against the user's spend ceiling. */
 export async function recordAiUsage(meter: Meter, model: string, usage: TokenUsage) {
   const micros = costMicros(model, usage);
+  const userId = meter.userId;
+  if (userId === null) throw new Error("recordAiUsage needs a user; sample reads go through holdCost/settleCost.");
   await db.$transaction(async (tx) => {
-    const u = await lockUsage(tx, meter.userId);
+    const u = await lockUsage(tx, userId);
     await tx.aiUsage.create({
       data: {
         userId: meter.userId,
@@ -247,7 +302,7 @@ export async function recordAiUsage(meter: Meter, model: string, usage: TokenUsa
         costMicros: micros,
       },
     });
-    await tx.user.update({ where: { id: meter.userId }, data: applyCost(u, micros) });
+    await tx.user.update({ where: { id: userId }, data: applyCost(u, micros) });
   });
   if (budgetCache) budgetCache.micros += micros;
   return micros;

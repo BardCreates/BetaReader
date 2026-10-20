@@ -9,3 +9,6 @@ next-env.d.ts
 .DS_Store
 coverage/
 src/generated/
+
+# Azure production settings
+infra/azure/app.env

@@ -15,7 +15,9 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "update": "npm install && prisma migrate deploy && prisma generate"
+    "update": "npm install && prisma migrate deploy && prisma generate",
+    "worker": "tsx --conditions=react-server src/worker.ts",
+    "stripe:setup": "tsx scripts/stripe-setup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -38,6 +40,7 @@
     "react-dom": "^19.3.1",
     "server-only": "^0.0.1",
     "stripe": "^23.0.0",
+    "tsx": "^4.23.15",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -48,7 +51,6 @@
     "@types/react-dom": "^19.3.0",
     "prisma": "^7.10.1",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.15",
     "typescript": "~5.9.3"
   },
   "engines": {

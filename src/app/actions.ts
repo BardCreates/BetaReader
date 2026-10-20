@@ -1,22 +1,24 @@
 "use server";
 
-import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser, signOut } from "@/auth";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { extractText } from "@/lib/manuscript/import";
+import { fromText, importFile, type ImportedManuscript } from "@/lib/manuscript/import";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { docToPlain, plainToDoc, sanitizeDoc } from "@/lib/manuscript/doc";
-import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
+import { countWords } from "@/lib/manuscript/split";
 import { getUsage, isLimitError, release, reserve, type Reservation } from "@/lib/billing/usage";
 import { remaining } from "@/lib/billing/period";
 import { planFor } from "@/lib/plans";
 import { PERSONAS } from "@/lib/reader/personas";
 import { lineEditText, type LineSuggestion } from "@/lib/reader/lineEdit";
-import { MIN_WORDS_TO_READ, claimManuscript, readManuscript, rereadChapter } from "@/lib/reader/pipeline";
+import { snapshotWrite } from "@/lib/reader/draftHistory";
+import { toJsonReservation } from "@/lib/jobs/handlers";
+import { scheduleJob } from "@/lib/jobs/schedule";
+import { MIN_WORDS_TO_READ, claimManuscript } from "@/lib/reader/pipeline";
 
 export type FormState = { error?: string } | undefined;
 
@@ -41,17 +43,17 @@ export async function createManuscript(_prev: FormState, form: FormData): Promis
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
 
-  let raw = parsed.data.text ?? "";
+  let imported: ImportedManuscript = fromText(parsed.data.text ?? "");
   const file = form.get("file");
   if (file instanceof File && file.size > 0) {
     try {
-      raw = await extractText(file);
+      imported = await importFile(file);
     } catch (err) {
       return { error: err instanceof Error ? err.message : "Couldn't read that file." };
     }
   }
-  const chapters = splitIntoChapters(raw);
-  const wordCount = countWords(raw);
+  const chapters = imported.chapters;
+  const wordCount = chapters.reduce((n, c) => n + c.wordCount, 0);
   if (!chapters.length || wordCount < 100) return { error: "Paste or upload at least a few pages (100+ words)." };
 
   const account = await db.user.findUniqueOrThrow({
@@ -90,15 +92,18 @@ export async function startReading(manuscriptId: string, fresh = false) {
   if (claim === "claimed") {
     if (fresh) {
       // Start over: a new read from chapter 1 with no memory of the previous read.
+      // Keep the old read so the new one can be compared with it.
+      const snapshot = await snapshotWrite(manuscriptId, "fresh_read");
       await db.$transaction([
+        ...(snapshot ? [snapshot.op] : []),
         db.chapterReview.deleteMany({ where: { chapter: { manuscriptId } } }),
         db.bookReport.deleteMany({ where: { manuscriptId } }),
         db.readerThread.deleteMany({ where: { manuscriptId } }),
         db.storyFact.deleteMany({ where: { manuscriptId } }),
       ]);
     }
-    // Respond immediately; the read continues after the response is sent.
-    after(() => readManuscript(manuscriptId));
+    // Respond immediately; the read runs as a background job.
+    await scheduleJob("read_manuscript", { manuscriptId });
   }
   revalidatePath(`/manuscripts/${manuscriptId}`);
 }
@@ -262,12 +267,17 @@ export async function rereadChapterNow(chapterId: string): Promise<FormState> {
     if (isLimitError(err)) return { error: err.message };
     throw err;
   }
-  await db.chapterReview.upsert({
-    where: { chapterId: chapter.id },
-    update: { status: "QUEUED", error: null },
-    create: { chapterId: chapter.id, status: "QUEUED" },
-  });
-  after(() => rereadChapter(chapter.id, reservation));
+  try {
+    await db.chapterReview.upsert({
+      where: { chapterId: chapter.id },
+      update: { status: "QUEUED", error: null },
+      create: { chapterId: chapter.id, status: "QUEUED" },
+    });
+    await scheduleJob("reread_chapter", { chapterId: chapter.id, reservation: toJsonReservation(reservation) });
+  } catch (err) {
+    await release(reservation).catch(() => {});
+    throw err;
+  }
   revalidatePath(`/manuscripts/${chapter.manuscript.id}`, "layout");
   return undefined;
 }

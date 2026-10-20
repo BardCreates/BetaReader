@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { PublicFooter, PublicHeader } from "@/components/PublicChrome";
+import { TrustBlock } from "@/components/TrustBlock";
 import { buttonClass, ghostButtonClass } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { BOOK_PASS, PLANS } from "@/lib/plans";
 
 export const metadata = { title: { absolute: `${BRAND.name}: an honest first reader for your manuscript` } };
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const signedIn = !!(await auth())?.user;
+  const deleted = (await searchParams).deleted === "1";
   const start = signedIn ? "/dashboard" : "/signin";
   const startLabel = signedIn ? "Open your manuscripts" : "Start your first read";
   const fmt = (n: number) => n.toLocaleString("en-US");
@@ -16,6 +18,13 @@ export default async function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       <PublicHeader signedIn={signedIn} />
+      {deleted && (
+        <p className="mx-auto mt-2 w-full max-w-6xl px-4 sm:px-8" role="status">
+          <span className="block rounded-lg bg-praise-soft px-4 py-2.5 text-sm text-praise">
+            Your account and everything in it have been deleted.
+          </span>
+        </p>
+      )}
 
       <main className="flex-1">
         {/* Hero: the promise, and a page the reader has marked up. */}
@@ -32,11 +41,28 @@ export default async function Home() {
               <Link href={start} className={`${buttonClass} px-5 py-2.5 text-base`}>
                 {startLabel}
               </Link>
-              <Link href="#how-it-works" className={`${ghostButtonClass} px-4 py-2.5 text-base`}>
-                How it works
-              </Link>
+              {signedIn ? (
+                <Link href="#how-it-works" className={`${ghostButtonClass} px-4 py-2.5 text-base`}>
+                  How it works
+                </Link>
+              ) : (
+                <Link href="/try" className={`${ghostButtonClass} px-4 py-2.5 text-base`}>
+                  Read a chapter free
+                </Link>
+              )}
             </div>
-            <p className="mt-4 text-sm text-muted">Your first {fmt(PLANS.free.allowance.words)} words are free. No card needed.</p>
+            <p className="mt-4 text-sm text-muted">
+              {signedIn ? (
+                <>Your first {fmt(PLANS.free.allowance.words)} words are free. No card needed.</>
+              ) : (
+                <>
+                  <Link href="/try" className="underline hover:text-ink">
+                    Paste a chapter
+                  </Link>{" "}
+                  and get notes in a minute, no sign-up. Or start free: your first {fmt(PLANS.free.allowance.words)} words are on us.
+                </>
+              )}
+            </p>
           </div>
 
           <AnnotatedPage />
@@ -50,7 +76,7 @@ export default async function Home() {
               {[
                 [
                   "Upload your draft",
-                  "Export a .docx from Dabble, Word, Scrivener or Google Docs, or paste it in. Your chapter headings split it into chapters.",
+                  "Export from Dabble (Word or Markdown), Word, Scrivener or Google Docs, or paste it in. Your chapter headings become chapters, and scene breaks come with them.",
                 ],
                 [
                   "It reads, in order",
@@ -103,15 +129,16 @@ export default async function Home() {
         <section className="border-t border-line">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 sm:px-8 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
             <div>
-              <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Talk with your characters.</h2>
+              <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Interview your cast.</h2>
               <p className="mt-4 text-lg leading-relaxed text-muted">
                 Stuck on a scene? Not sure why she’d say that? Ask her. Your characters answer in their own voice, drawing on every page they appear
-                on, so you can interview them, test a scene before you write it, or find the backstory you haven’t figured out yet.
+                on, so you can push on a motivation, stress-test a backstory, find the line they’d never cross, or spot what you haven’t decided yet.
               </p>
               <ul className="mt-7 space-y-4">
                 {[
                   ["They stay true to your book.", "Each character knows the passages they’re in and the profile you’ve written, and won’t contradict the page."],
                   ["You can see what’s new.", "Anything they invent beyond your manuscript is highlighted, so you always know canon from brainstorm."],
+                  ["Guided interviews.", "Interrogate a motivation, stress-test a backstory, find what they’d never do, or ask for canon only, where gaps are named instead of filled."],
                   ["Meet them at any point in the story.", "Limit what they know to a chapter and talk to who they were back then."],
                   ["Keep what’s useful.", "Save a good answer to their profile in one click, and it becomes part of who they are."],
                 ].map(([t, d]) => (
@@ -154,7 +181,6 @@ export default async function Home() {
               ["Notes on the page", "Reactions, praise and problems anchored to the exact passage, each problem with a concrete way to fix it. Mark them fixed as you go."],
               ["A story bible", "The facts your book establishes, gathered as it reads: who’s who, injuries, ages, places, timeline and the rules of your world."],
               ["Three kinds of reader", "Choose a devoted genre reader, a developmental editor for structure and stakes, or a line editor for voice and prose."],
-              ["A pitch kit", "A logline, back-cover blurb, synopsis and query letter drafted from how the book actually read, plus what made it hard to pitch."],
               ["A place to write", "A clean editor with your chapters in a book outline, the reader’s notes beside the text, and grammar and style suggestions when you want them."],
             ].map(([t, d]) => (
               <div key={t} className="border-l-2 border-line pl-5">
@@ -233,6 +259,10 @@ export default async function Home() {
           </div>
         </section>
 
+        <div className="mx-auto max-w-6xl px-4 sm:px-8">
+          <TrustBlock />
+        </div>
+
         <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-8">
           {/* The brand's ink blue in both themes, like the mark. */}
           <div className="flex flex-wrap items-center justify-between gap-6 rounded-2xl bg-[#24407c] px-8 py-10 text-white">
@@ -305,7 +335,7 @@ const FAQ: [string, string][] = [
   ],
   [
     "Which files can I upload?",
-    "Word (.docx), plain text and Markdown, or paste text in. From Dabble, Scrivener or Google Docs, export a .docx. Start each chapter with a heading like “Chapter 1” so it splits cleanly.",
+    "Word (.docx), Markdown and plain text, or paste text in. From Dabble, export to Word or Markdown: chapters come across as they are in Dabble, the title page is left out and scene separators become scene breaks. From Scrivener or Google Docs, export a .docx. Files without heading styles split on lines like “Chapter 1”.",
   ],
   [
     "How long does a read take?",

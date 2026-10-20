@@ -39,6 +39,9 @@ export const ChapterFeedbackSchema = z.object({
   reaction: z.string().min(1),
   summary: z.string().min(1),
   engagement: score(1, 10),
+  // Optional so reads stored before the drop-off map still parse.
+  confusion: score(1, 10).nullish(),
+  driftPoint: z.object({ quote: z.string().min(3), reason: z.string().min(1) }).nullish(),
   strengths: z.array(z.string()).default([]),
   notes: z.array(ChapterNoteSchema).default([]),
   questions: z.array(z.string()).default([]),
@@ -76,6 +79,7 @@ export const chapterFeedbackTool = {
       "reaction",
       "summary",
       "engagement",
+      "confusion",
       "strengths",
       "notes",
       "questions",
@@ -101,6 +105,23 @@ export const chapterFeedbackTool = {
         maximum: 10,
         description: "How much you wanted to keep reading at the end of this chapter. 5 = would continue out of duty; 8+ = couldn't put it down.",
       },
+      confusion: {
+        type: "integer",
+        minimum: 1,
+        maximum: 10,
+        description:
+          "How lost you were in this chapter: 1 = always knew who, where and why; 5 = had to reread to follow; 8+ = genuinely lost. Intended mystery (wanting to know) is not confusion (not following).",
+      },
+      driftPoint: {
+        type: "object",
+        description:
+          "The single moment in this chapter where your attention slipped most, where a real reader would be likeliest to put the book down. Omit only if it never slipped.",
+        required: ["quote", "reason"],
+        properties: {
+          quote: { type: "string", description: "Exact text copied verbatim from the chapter, 5–40 words, at the point attention slipped." },
+          reason: { type: "string", description: "One or two sentences: why attention slipped here (repetition, stakes unclear, lost the thread...)." },
+        },
+      },
       strengths: {
         type: "array",
         items: { type: "string" },
@@ -124,7 +145,7 @@ export const chapterFeedbackTool = {
             comment: { type: "string", description: "What you felt or noticed here, and why it matters to a reader." },
             suggestion: {
               type: "string",
-              description: "For issues: a concrete way to fix it (an approach, and where helpful a short example rewrite). Omit for reactions.",
+              description: "For issues: a concrete way to fix it, described as an approach (what to cut, move, set up or show). Never write replacement prose or an example rewrite. Omit for reactions.",
             },
           },
         },
@@ -187,7 +208,7 @@ export const chapterFeedbackTool = {
               description: "The story bible id it contradicts (e.g. F12). Omit when the contradiction is inside this chapter.",
             },
             explanation: { type: "string", description: "What the contradiction is, stating both versions." },
-            suggestion: { type: "string", description: "How to reconcile it." },
+            suggestion: { type: "string", description: "How to reconcile it, as an approach. Never write replacement prose." },
           },
         },
       },
@@ -275,7 +296,7 @@ export const bookReportTool = {
             title: { type: "string" },
             detail: { type: "string", description: "What isn't working and its effect on the reader." },
             chapters: { type: "array", items: { type: "integer" }, description: "1-based chapter numbers where it shows up most." },
-            fix: { type: "string", description: "How to fix it: a concrete approach the author can act on." },
+            fix: { type: "string", description: "How to fix it: a concrete approach the author can act on. Describe it; never write replacement prose." },
             priority: { type: "integer", minimum: 1, maximum: 3, description: "1 = fix first (structural), 3 = polish." },
           },
         },

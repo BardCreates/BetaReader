@@ -11,6 +11,11 @@ export function PublicHeader({ signedIn = false }: { signedIn?: boolean }) {
         <Logo />
       </Link>
       <nav className="flex items-center gap-1 text-[0.95rem] sm:gap-2">
+        {!signedIn && (
+          <Link href="/try" className="hidden rounded-lg px-3 py-1.5 whitespace-nowrap text-muted transition-colors hover:text-ink md:inline">
+            Try a chapter
+          </Link>
+        )}
         <Link href="/pricing" className="rounded-lg px-3 py-1.5 whitespace-nowrap text-muted transition-colors hover:text-ink">
           Pricing
         </Link>
@@ -44,12 +49,15 @@ export function PublicFooter() {
           <Logo size="sm" />
           <span className="hidden sm:inline">{BRAND.tagline}</span>
         </div>
-        <nav className="flex gap-5">
+        <nav className="flex flex-wrap gap-x-5 gap-y-2">
           <Link href="/pricing" className="hover:text-ink">
             Pricing
           </Link>
-          <Link href="/signin" className="hover:text-ink">
-            Sign in
+          <Link href="/privacy" className="hover:text-ink">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-ink">
+            Terms
           </Link>
           <span>© {new Date().getFullYear()} {BRAND.name}</span>
         </nav>

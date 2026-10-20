@@ -1,6 +1,5 @@
 "use server";
 
-import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/auth";
@@ -8,13 +7,15 @@ import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { plainToDoc } from "@/lib/manuscript/doc";
-import { extractText } from "@/lib/manuscript/import";
+import { fromText, importFile } from "@/lib/manuscript/import";
 import { canonicalText, matchChapters, summarizeChanges, type ChapterChange } from "@/lib/manuscript/match";
-import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
+import { countWords } from "@/lib/manuscript/split";
 import { planFor } from "@/lib/plans";
 import { remaining } from "@/lib/billing/period";
 import { getUsage } from "@/lib/billing/usage";
-import { MIN_WORDS_TO_READ, claimManuscript, readManuscript } from "@/lib/reader/pipeline";
+import { snapshotWrite } from "@/lib/reader/draftHistory";
+import { scheduleJob } from "@/lib/jobs/schedule";
+import { MIN_WORDS_TO_READ, claimManuscript } from "@/lib/reader/pipeline";
 
 export type ReimportPreview = {
   changes: ChapterChange[];
@@ -26,11 +27,11 @@ export type ReimportPreview = {
 };
 export type ReimportState = { error?: string; preview?: ReimportPreview } | undefined;
 
-async function readUpload(form: FormData): Promise<string> {
+async function readUpload(form: FormData) {
   const file = form.get("file");
-  if (file instanceof File && file.size > 0) return extractText(file);
+  if (file instanceof File && file.size > 0) return importFile(file);
   const text = form.get("text");
-  return typeof text === "string" ? text : "";
+  return fromText(typeof text === "string" ? text : "");
 }
 
 /**
@@ -55,13 +56,13 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
     return { error: "The reader is partway through this book. Update the draft when the read finishes." };
   }
 
-  let raw: string;
+  let upload: Awaited<ReturnType<typeof readUpload>>;
   try {
-    raw = await readUpload(form);
+    upload = await readUpload(form);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Couldn't read that file." };
   }
-  const incoming = splitIntoChapters(raw);
+  const incoming = upload.chapters;
   // Same measure as the manuscript's stored total: chapter text only, headings excluded.
   const words = incoming.reduce((sum, c) => sum + countWords(canonicalText(c.content)), 0);
   if (!incoming.length || words < 100) return { error: "That file looks empty. Upload the full draft (100+ words)." };
@@ -88,6 +89,9 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
   const now = new Date();
   const byId = new Map(ms.chapters.map((c) => [c.id, c]));
   const ops: Prisma.PrismaPromise<unknown>[] = [];
+  // Keep how the read of this draft stood, so the next read can be compared with it.
+  const snapshot = await snapshotWrite(ms.id, "reimport");
+  if (snapshot) ops.push(snapshot.op);
 
   // 1. Drop removed chapters, and park the rest on temporary indexes so renumbering can't clash.
   const removed = changes.flatMap((c) => (c.kind === "removed" ? [c.id] : []));
@@ -147,7 +151,7 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
     );
   }
 
-  ops.push(db.manuscript.update({ where: { id: ms.id }, data: { wordCount: words } }));
+  ops.push(db.manuscript.update({ where: { id: ms.id }, data: { wordCount: words, draft: { increment: 1 } } }));
   await db.$transaction(ops);
 
   revalidatePath(`/manuscripts/${ms.id}`, "layout");
@@ -165,7 +169,7 @@ export async function readChangedChapters(manuscriptId: string) {
   const claim = await claimManuscript(manuscriptId, user.id);
   if (claim === "otherBusy") redirect(`${base}?notice=busy`);
   if (claim === "claimed") {
-    after(() => readManuscript(manuscriptId, { rereadChanged: true }));
+    await scheduleJob("read_manuscript", { manuscriptId, rereadChanged: true });
   }
   revalidatePath(`/manuscripts/${manuscriptId}`, "layout");
 }

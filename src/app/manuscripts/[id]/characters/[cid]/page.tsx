@@ -7,6 +7,7 @@ import { FEATURES } from "@/lib/features";
 import { AvatarUpload } from "./AvatarUpload";
 import { CharacterChat } from "./CharacterChat";
 import { CharacterBasics, CharacterProfileForm } from "./CharacterProfile";
+import { INTERVIEW_MODES, modeFor } from "@/lib/reader/interview";
 
 export default async function CharacterPage({
   params,
@@ -26,7 +27,7 @@ export default async function CharacterPage({
     where: { id: cid, manuscriptId: id, manuscript: { userId: user.id } },
     include: {
       manuscript: { select: { id: true, _count: { select: { chapters: true } } } },
-      conversations: { orderBy: { updatedAt: "desc" }, take: 30, select: { id: true, title: true, asOfChapter: true } },
+      conversations: { orderBy: { updatedAt: "desc" }, take: 30, select: { id: true, title: true, asOfChapter: true, mode: true } },
     },
   });
   if (!c) notFound();
@@ -72,6 +73,7 @@ export default async function CharacterPage({
                 className={`block truncate rounded-lg px-3 py-2 text-sm ${x.id === current?.id ? "bg-line/60" : "text-muted hover:bg-line/30 hover:text-ink"}`}
               >
                 {x.title || "Conversation"}
+                {x.mode && x.mode !== "open" ? <span className="text-xs"> · {INTERVIEW_MODES[modeFor(x.mode)].label}</span> : null}
                 {x.asOfChapter ? <span className="text-xs"> · to ch. {x.asOfChapter}</span> : null}
               </Link>
             ))}
@@ -131,6 +133,7 @@ export default async function CharacterPage({
             totalChapters={c.manuscript._count.chapters}
             conversationId={current?.id ?? null}
             asOfChapter={current?.asOfChapter ?? null}
+            mode={current?.mode ?? null}
             initialMessages={messages.map((m) => ({ id: m.id, role: m.role as "user" | "assistant", content: m.content }))}
           />
         )}

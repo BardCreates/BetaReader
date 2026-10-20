@@ -8,6 +8,10 @@ import { buttonClass, Card, ghostButtonClass } from "@/components/ui";
 import { usageSummary } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
 import { getSidebar } from "@/lib/sidebar";
+import { BOOK_PASS } from "@/lib/plans";
+import { MODEL_VENDOR } from "@/lib/trust";
+import { DeleteAccountForm } from "./DeleteAccountForm";
+import { FEATURES } from "@/lib/features";
 
 export const metadata = { title: "Account" };
 
@@ -23,6 +27,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       wordsReadTotal: true,
       createdAt: true,
       stripeCustomerId: true,
+      stripeSubscriptionId: true,
       subscriptionStatus: true,
       billingInterval: true,
       cancelAtPeriodEnd: true,
@@ -88,7 +93,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <Meter label={`Words read${per}`} m={usage.words} />
             <Meter label={`Grammar & style${per}`} m={usage.grammarWords} unit="words" />
             <Meter label={`Character chat${per}`} m={usage.chat} unit="messages" />
-            <Meter label={`Pitch kits${per}`} m={usage.pitchKits} />
+            {FEATURES.pitchKit && <Meter label={`Pitch kits${per}`} m={usage.pitchKits} />}
           </div>
           {usage.spendBlocked && (
             <p className="mt-5 rounded-lg bg-issue-soft px-3 py-2 text-sm text-issue">
@@ -103,7 +108,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <p className="mt-0.5 text-sm text-muted">
               {usage.words.pass > 0
                 ? `You have ${fmt(usage.words.pass)} words of pass credit. It never expires and is used after your plan’s allowance.`
-                : "A full read of a novel and a pitch kit for $29, on any plan. Never expires."}
+                : `A full read of a novel${FEATURES.pitchKit ? " and a pitch kit" : ""} for $${BOOK_PASS.price}, on any plan. Never expires.`}
             </p>
           </div>
           <form action={startCheckout.bind(null, "pass")}>
@@ -127,6 +132,22 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <p className="mt-2 text-sm text-muted">{fmt(account.wordsReadTotal)} words read in total</p>
           </Card>
         </div>
+
+        <Card className="mt-4">
+          <p className="font-medium">Your data</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            Your manuscripts are private to you, encrypted, and never used to train AI: not by us, and not by {MODEL_VENDOR.company}, who make the
+            reader. <Link href="/privacy" className="text-accent underline">How your writing is handled</Link>.
+          </p>
+          <div className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-3">
+            <a href="/api/account/export" className={ghostButtonClass} download>
+              Download all my data
+            </a>
+            <div className="pt-1.5">
+              <DeleteAccountForm hasSubscription={!!account.stripeSubscriptionId && account.subscriptionStatus !== "canceled"} />
+            </div>
+          </div>
+        </Card>
 
         <form action={signOutAction} className="mt-8">
           <button className={ghostButtonClass}>Sign out</button>

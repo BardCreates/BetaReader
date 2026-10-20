@@ -1,0 +1,69 @@
+name: Deploy to Azure
+
+# Builds one image in Azure Container Registry, applies database migrations, and rolls it out
+# to the web and worker container apps. Does nothing until the repository variables below are
+# set (see docs/deploy-azure.md), so it's safe to have on before Azure is set up.
+#
+# Repository variables: AZURE_RESOURCE_GROUP, AZURE_ACR_NAME, AZURE_CONTAINER_APP_WEB,
+#   AZURE_CONTAINER_APP_WORKER, AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+# Repository secrets: DATABASE_URL (or DATABASE_URL_DIRECT: a non-pooled connection for migrations)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write # sign in to Azure with OIDC, no stored password
+  contents: read
+
+concurrency:
+  group: deploy-azure
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.AZURE_CONTAINER_APP_WEB != '' }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      IMAGE: ${{ vars.AZURE_ACR_NAME }}.azurecr.io/readthrough:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Check
+        run: npm run typecheck && npm test
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DIRECT || secrets.DATABASE_URL }}
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build image
+        run: az acr build --registry "${{ vars.AZURE_ACR_NAME }}" --image "readthrough:${{ github.sha }}" --image readthrough:latest .
+
+      - name: Roll out web and worker
+        run: |
+          az containerapp update -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_CONTAINER_APP_WEB }}" --image "$IMAGE"
+          az containerapp update -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_CONTAINER_APP_WORKER }}" --image "$IMAGE"
+
+      - name: Check the site is up
+        run: |
+          fqdn=$(az containerapp show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_CONTAINER_APP_WEB }}" --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 30); do
+            if curl -fsS "https://$fqdn/api/health"; then exit 0; fi
+            sleep 10
+          done
+          echo "Health check failed for https://$fqdn" && exit 1
