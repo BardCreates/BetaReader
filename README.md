@@ -25,11 +25,17 @@ upload (.docx/.txt/.md or paste)
 - **Intent check.** Authors note what a chapter should do; the reader sees it only after forming its own reaction and reports whether it landed.
 - **Revision check.** Re-reading a chapter checks each earlier issue (fixed / partly / still there) and compares engagement.
 - **Grammar & style.** On demand, on a smaller model (`ANTHROPIC_LINE_MODEL`); suggestions are underlined in the editor with accept/dismiss (`src/lib/reader/lineEdit.ts`).
-- **Character chat.** Characters are found in the manuscript (or added by hand) and talk in voice, grounded in the passages they appear in (`src/lib/reader/characterContext.ts`); invented details are marked ⟦like this⟧; knowledge can be limited to a chapter; replies can be saved to the character's notes.
+- **Drop-off map.** Each read scores how much the reader wanted to keep going and how lost they were, and quotes the passage where attention slipped most. `/manuscripts/[id]/dropoff` puts it chapter by chapter and picks out where a reader would be likeliest to stop (`src/lib/reader/dropoff.ts`).
+- **Draft comparison.** When a revised draft is imported (or a fresh read starts over), the read of the old draft is kept as a `DraftSnapshot`. `/manuscripts/[id]/drafts` compares it with the read now: engagement per chapter, problems fixed and new, continuity errors fixed and introduced (`src/lib/reader/drafts.ts`).
+- **Character chat.** Characters are found in the manuscript (or added by hand) and talk in voice, grounded in the passages they appear in (`src/lib/reader/characterContext.ts`); invented details are marked ⟦like this⟧; knowledge can be limited to a chapter; replies can be saved to the character's notes. Guided interview modes (interrogate a motivation, stress-test a backstory, what they'd never do, canon only) are in `src/lib/reader/interview.ts`; characters also get the story-bible facts about them.
 - **Editor chat (off in v1).** Switched off in `src/lib/features.ts` to keep v1 focused on the read; flip `editorChat` to bring it back. Streams replies with the book report, chapter summaries and (for chapter conversations) the full chapter text and notes in context (`src/lib/reader/editor.ts`).
+- **Dabble import.** Word (.docx) and Markdown files are split by their heading structure (`src/lib/manuscript/structure.ts`): the way Dabble exports mark chapters, with its title page left out and scene separators kept as scene breaks. Files without heading styles fall back to "Chapter 1"-style lines.
 - **Update from a new draft.** Revise in Dabble, Word or Google Docs, export, and upload the new version (`/manuscripts/[id]/update`). Chapters are matched to the existing ones in order, by shared text and title (`src/lib/manuscript/match.ts`), so inserted, removed and renamed chapters line up; you see a preview before anything changes. Unchanged chapters keep their notes and reads; **Read the changes** reads only new and edited chapters, then refreshes the report.
 - **Continuity & story bible.** Each read records the concrete facts a chapter establishes (`StoryFact`: traits, injuries, timeline, places, rules of the world) and checks the chapter against facts from earlier chapters only. Contradictions become `continuity` notes anchored to the passage, citing the earlier fact. `/manuscripts/[id]/bible` lists the problems and the facts by subject.
-- **Pitch kit.** After a full read: logline, back-cover blurb, synopsis, query letter, selling points, comp suggestions, and honest notes on what made the book hard to pitch (`src/lib/reader/pitch.ts`, `/manuscripts/[id]/pitch`). Built from the read's summaries and report, not the full text, so it's cheap.
+- **Free sample read.** `/try` reads one pasted chapter with no account (`src/lib/trialRead.ts`): per-visitor and daily limits, its own daily AI budget, optional Turnstile, deleted after 7 days.
+- **Background jobs.** Reads, re-reads and sample reads are jobs in Postgres (`src/lib/jobs`), claimed with `SKIP LOCKED` and retried if a worker dies. By default the web server runs them; in production set `JOBS_MODE=worker` and run `npm run worker` too.
+- **Privacy.** `/privacy` and `/terms`, the manuscript policy on the pricing and landing pages (`src/lib/trust.ts`), data export (`/api/account/export`) and one-click account deletion on the account page.
+- **Pitch kit (off in v1).** Switched off with `FEATURES.pitchKit` because v1 reads and never writes. After a full read: logline, back-cover blurb, synopsis, query letter, selling points, comp suggestions, and honest notes on what made the book hard to pitch (`src/lib/reader/pitch.ts`, `/manuscripts/[id]/pitch`). Built from the read's summaries and report, not the full text, so it's cheap.
 - **Write in the app.** A left menu lists every chapter like a book outline. Each chapter opens in an editor (paragraphs, bold, italic, scene breaks) that autosaves. The reader's notes stay beside the text and their highlights follow your edits; chapters you've changed since their last read are marked, and **Re-read this chapter** gets fresh feedback when you're ready. Chapters are stored as formatted documents (`Chapter.doc`) with a plain-text copy (`Chapter.content`) that the AI reads and notes anchor to — see `src/lib/manuscript/doc.ts`.
 
 ## Stack
@@ -59,6 +65,7 @@ Run `npm run update`. It installs any new packages, applies new database migrati
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | Start the dev server |
+| `npm run worker` | Run background jobs (production, with `JOBS_MODE=worker`) |
 | `npm test` | Unit tests (chapter splitting, quote anchoring) |
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build |
@@ -110,10 +117,12 @@ Three layers keep costs bounded (`src/lib/billing`):
 
 Plans are matched to subscriptions by price id, so changing a price in Stripe only needs the env var updated. The webhook always re-reads the subscription from Stripe (events can arrive out of order), checkout refuses to start a second subscription, and book passes are credited once per checkout session (including 100% promotion codes and delayed payment methods) and removed on a full refund.
 
+## Deploying
+
+See [docs/deploy-azure.md](docs/deploy-azure.md): one Docker image, run as a web app and a worker on Azure Container Apps, with Neon for Postgres and a GitHub Actions workflow that deploys `main`.
+
 ## Roadmap to SaaS
 
-- **Durable background jobs.** Reading currently runs in-process via `after()`. That's fine locally and on a long-running Node server, but serverless platforms cap function duration. Move `readManuscript` to a job runner (Inngest, Trigger.dev, or a queue + worker) — it's already resumable chapter by chapter.
-- **More formats.** PDF and EPUB import; Scrivener via .docx export works today.
+- **More formats.** Scrivener and PDF/EPUB import; Scrivener via .docx export works today.
 - **Export.** Download the report and notes as .docx/PDF.
-- **Comparisons.** Show how engagement changed between reads after a revision.
-- **Privacy.** Manuscripts are private per account. Before launch: a privacy policy stating manuscripts aren't used for training, data deletion, and encryption at rest from your database host.
+- **Before launch.** Have `/privacy` and `/terms` reviewed, and confirm your database host encrypts at rest (Neon does).
