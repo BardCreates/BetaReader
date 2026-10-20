@@ -6,11 +6,13 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/auth";
 import { isLimitError, reserve, type Reservation } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
+import { FEATURES } from "@/lib/features";
 import { STALE_READ_MS } from "@/lib/reader/pipeline";
 import { writePitchKit } from "@/lib/reader/pitch";
 
 /** Write (or rewrite) the pitch kit. Needs a finished read, since it's built from the reader's notes. */
 export async function generatePitchKit(manuscriptId: string) {
+  if (!FEATURES.pitchKit) return; // deferred for v1 (see src/lib/features.ts)
   const user = await requireUser();
   const ms = await db.manuscript.findFirst({
     where: { id: manuscriptId, userId: user.id },

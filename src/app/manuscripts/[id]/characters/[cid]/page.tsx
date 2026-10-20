@@ -26,7 +26,7 @@ export default async function CharacterPage({
     where: { id: cid, manuscriptId: id, manuscript: { userId: user.id } },
     include: {
       manuscript: { select: { id: true, _count: { select: { chapters: true } } } },
-      conversations: { orderBy: { updatedAt: "desc" }, take: 30, select: { id: true, title: true, asOfChapter: true } },
+      conversations: { orderBy: { updatedAt: "desc" }, take: 30, select: { id: true, title: true, asOfChapter: true, mode: true } },
     },
   });
   if (!c) notFound();
@@ -63,7 +63,7 @@ export default async function CharacterPage({
           <section>
             <h2 className="mb-2 font-serif text-base font-semibold">Conversations</h2>
             <Link href={base} className="mb-1 block rounded-lg border border-line px-3 py-2 text-sm font-medium hover:bg-line/40">
-              + New conversation
+              + New interview
             </Link>
             {c.conversations.map((x) => (
               <Link
@@ -83,7 +83,7 @@ export default async function CharacterPage({
         <nav className="mb-5 flex gap-1 border-b border-line" aria-label="Character sections">
           {(
             [
-              ["talk", `Talk with ${first}`, current ? `${base}?c=${current.id}` : base],
+              ["talk", `Interview ${first}`, current ? `${base}?c=${current.id}` : base],
               ["profile", "Profile", `${base}?tab=profile`],
             ] as const
           ).map(([key, label, href]) => (
@@ -103,7 +103,7 @@ export default async function CharacterPage({
         {tab === "profile" ? (
           <Card>
             <p className="mb-5 max-w-2xl text-sm text-muted">
-              Who {first} is. Anything you write here is canon: the reader uses the pronouns, and {first} draws on all of it when you talk.
+              Who {first} is. Anything you write here is canon: the reader uses the pronouns, and {first} draws on all of it in interviews.
             </p>
             <CharacterProfileForm
               key={`profile-${c.updatedAt.getTime()}`}
@@ -131,6 +131,7 @@ export default async function CharacterPage({
             totalChapters={c.manuscript._count.chapters}
             conversationId={current?.id ?? null}
             asOfChapter={current?.asOfChapter ?? null}
+            mode={current?.mode ?? null}
             initialMessages={messages.map((m) => ({ id: m.id, role: m.role as "user" | "assistant", content: m.content }))}
           />
         )}

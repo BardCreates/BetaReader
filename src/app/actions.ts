@@ -172,7 +172,7 @@ export async function renameChapter(chapterId: string, title: string): Promise<F
 
 export type GrammarResult = { ok: true; suggestions: LineSuggestion[] } | { ok: false; error: string };
 
-/** Grammar & style check on the chapter as it is in the editor right now (unsaved changes included). */
+/** Proofread the chapter as it is in the editor right now (unsaved changes included). */
 export async function checkGrammar(chapterId: string, rawDoc: unknown): Promise<GrammarResult> {
   const user = await requireUser();
   const chapter = await ownedChapter(chapterId, user.id);
@@ -194,7 +194,7 @@ export async function checkGrammar(chapterId: string, rawDoc: unknown): Promise<
     await release(reservation).catch(() => {});
     if (isLimitError(err)) return { ok: false, error: err.message };
     console.error("grammar check failed", err);
-    return { ok: false, error: "The grammar check didn't finish. Please try again." };
+    return { ok: false, error: "The proofread didn't finish. Please try again." };
   }
 }
 

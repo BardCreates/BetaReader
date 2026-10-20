@@ -62,6 +62,7 @@ export const ChapterFeedbackSchema = z.object({
   revisionCheck: z
     .array(z.object({ id: z.string(), verdict: ciEnum(["fixed", "partly", "still_there"]), explanation: z.string() }))
     .nullish(),
+  dropOff: z.object({ quote: z.string().min(3), why: z.string().min(1) }).nullish(),
 });
 
 export type ChapterFeedback = z.infer<typeof ChapterFeedbackSchema>;
@@ -124,7 +125,8 @@ export const chapterFeedbackTool = {
             comment: { type: "string", description: "What you felt or noticed here, and why it matters to a reader." },
             suggestion: {
               type: "string",
-              description: "For issues: a concrete way to fix it (an approach, and where helpful a short example rewrite). Omit for reactions.",
+              description:
+                "For issues: how to approach a fix (what to cut, move, add, set up earlier, or show instead of tell) and why it would work. Describe the approach; never write replacement sentences or example prose. Omit for reactions.",
             },
           },
         },
@@ -187,8 +189,18 @@ export const chapterFeedbackTool = {
               description: "The story bible id it contradicts (e.g. F12). Omit when the contradiction is inside this chapter.",
             },
             explanation: { type: "string", description: "What the contradiction is, stating both versions." },
-            suggestion: { type: "string", description: "How to reconcile it." },
+            suggestion: { type: "string", description: "How to reconcile it (which version to keep, or what to establish), described, not rewritten." },
           },
+        },
+      },
+      dropOff: {
+        type: "object",
+        description:
+          "The one moment in this chapter where your attention dipped most: where you started skimming, got lost, or felt like putting the book down. Omit it if your attention never dipped.",
+        required: ["quote", "why"],
+        properties: {
+          quote: { type: "string", description: "The passage where it happened, copied EXACTLY from the chapter, 5–40 words." },
+          why: { type: "string", description: "One or two sentences: what made you drift there." },
         },
       },
       intentCheck: {
@@ -275,7 +287,7 @@ export const bookReportTool = {
             title: { type: "string" },
             detail: { type: "string", description: "What isn't working and its effect on the reader." },
             chapters: { type: "array", items: { type: "integer" }, description: "1-based chapter numbers where it shows up most." },
-            fix: { type: "string", description: "How to fix it: a concrete approach the author can act on." },
+            fix: { type: "string", description: "How to fix it: a concrete approach the author can act on, described, never rewritten for them." },
             priority: { type: "integer", minimum: 1, maximum: 3, description: "1 = fix first (structural), 3 = polish." },
           },
         },

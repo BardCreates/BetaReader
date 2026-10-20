@@ -6,6 +6,7 @@ import { appendCharacterNote } from "@/app/characterActions";
 import { CharacterAvatar } from "@/components/CharacterAvatar";
 import { Markdown } from "@/components/Markdown";
 import { buttonClass, Card, inputClass } from "@/components/ui";
+import { INTERVIEW_MODES, interviewMode, isInterviewMode, type InterviewMode } from "@/lib/reader/interview";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
@@ -17,6 +18,7 @@ export function CharacterChat(props: {
   totalChapters: number;
   conversationId: string | null;
   asOfChapter: number | null;
+  mode: string | null;
   initialMessages: Msg[];
 }) {
   const router = useRouter();
@@ -25,6 +27,7 @@ export function CharacterChat(props: {
   const [draft, setDraft] = useState("");
   const [conversationId, setConversationId] = useState(props.conversationId);
   const [asOf, setAsOf] = useState<number | null>(props.asOfChapter);
+  const [mode, setMode] = useState<InterviewMode>(isInterviewMode(props.mode) ? props.mode : "open");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -35,12 +38,7 @@ export function CharacterChat(props: {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
-  const starters = [
-    `What do you want more than anything?`,
-    `What are you afraid the others will find out?`,
-    `Tell me about the day before the story starts.`,
-    `OOC: Where does ${first}'s arc feel thin?`,
-  ];
+  const starters = interviewMode(mode).starters(first);
 
   async function send(text: string) {
     const message = text.trim();
@@ -54,7 +52,7 @@ export function CharacterChat(props: {
       const res = await fetch(`/api/manuscripts/${props.manuscriptId}/characters/${props.characterId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, asOfChapter: asOf, message }),
+        body: JSON.stringify({ conversationId, asOfChapter: asOf, mode, message }),
       });
       if (!res.ok || !res.body) throw new Error((await res.text()) || `Request failed (${res.status})`);
       const newId = res.headers.get("X-Conversation-Id");
@@ -108,19 +106,36 @@ export function CharacterChat(props: {
             ))}
           </select>
         )}
+        {conversationId && mode !== "open" && <span className="rounded-full bg-line/60 px-2.5 py-0.5 text-xs text-muted">{INTERVIEW_MODES[mode].label}</span>}
         <span className="ml-auto text-xs text-muted">
-          <mark className="invented">Highlighted</mark> = invented, not in your manuscript
+          <mark className="invented">Highlighted</mark> = not on the page: a gap your manuscript doesn’t fill yet
         </span>
       </div>
 
       <div className="space-y-4">
         {messages.length === 0 && (
           <Card>
-            <p className="font-serif text-lg">Ask {first} anything.</p>
+            <p className="font-serif text-lg">Interview {first}.</p>
             <p className="mt-1 text-sm text-muted">
-              They answer in character. Start a message with <code className="rounded bg-line/60 px-1">OOC:</code> to step out of character and talk
-              about {first} as a writer.
+              {first} answers in character from what your manuscript establishes, and highlights anything the page doesn’t say, so you can see the
+              gaps. Start a message with <code className="rounded bg-line/60 px-1">OOC:</code> to step out of character and talk about {first} as a
+              writer.
             </p>
+            <div className="mt-4 flex flex-wrap gap-1.5" role="group" aria-label="Interview mode">
+              {(Object.keys(INTERVIEW_MODES) as InterviewMode[]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={mode === k}
+                  onClick={() => setMode(k)}
+                  title={INTERVIEW_MODES[k].hint}
+                  className={`rounded-full px-3 py-1 text-xs ${mode === k ? "bg-accent-soft font-medium text-accent" : "bg-line/60 text-muted hover:text-ink"}`}
+                >
+                  {INTERVIEW_MODES[k].label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted">{INTERVIEW_MODES[mode].hint}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {starters.map((s) => (
                 <button key={s} onClick={() => send(s)} className="rounded-full border border-line px-3 py-1.5 text-left text-sm hover:bg-line/40">

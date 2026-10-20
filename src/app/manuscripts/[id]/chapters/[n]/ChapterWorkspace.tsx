@@ -8,7 +8,9 @@ import { buttonClass, Card, ghostButtonClass } from "@/components/ui";
 import { Prose } from "@/components/Prose";
 import { FEATURES } from "@/lib/features";
 import type { DocNode } from "@/lib/manuscript/doc";
+import { isMechanical } from "@/lib/reader/lineSuggestions";
 import { ChapterEditor, type ChapterEditorHandle, type Suggestion } from "./ChapterEditor";
+import { NoteThread } from "./NoteThread";
 
 export type NoteView = {
   id: string;
@@ -20,6 +22,10 @@ export type NoteView = {
   comment: string;
   suggestion: string | null;
   status: "OPEN" | "RESOLVED" | "DISMISSED";
+  /** For continuity notes: the earlier fact this passage contradicts. */
+  conflict: { fact: string; chapter: number } | null;
+  /** The author has already asked the reader about this note. */
+  discussed: boolean;
 };
 
 export type IntentCheck = { intent: string; landed: "yes" | "partly" | "no"; explanation: string };
@@ -40,6 +46,7 @@ export type ReviewView = {
   notes: NoteView[];
   intentCheck: IntentCheck | null;
   revisionCheck: RevisionCheck | null;
+  dropOff: { quote: string; why: string } | null;
 };
 
 type Props = {
@@ -172,7 +179,7 @@ export function ChapterWorkspace(p: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Grammar & style ───────────────────────────────────────────
+  // ─── Proofread ─────────────────────────────────────────────────
   const [tab, setTab] = useState<"notes" | "grammar">("notes");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [liveIds, setLiveIds] = useState<string[]>([]);
@@ -197,11 +204,14 @@ export function ChapterWorkspace(p: Props) {
     editorRef.current?.setSuggestions(res.suggestions);
     setGrammar({ state: "done", found: res.suggestions.length });
   };
-  const accept = (sug: Suggestion) => editorRef.current?.acceptSuggestion(sug.id, sug.replacement);
+  // Only mechanical fixes can be applied; flags are for the author to rewrite.
+  const accept = (sug: Suggestion) => {
+    if (!sug.flag) editorRef.current?.acceptSuggestion(sug.id, sug.replacement);
+  };
   const dismiss = (sug: Suggestion) => editorRef.current?.dismissSuggestion(sug.id);
   const acceptAll = (types: string[]) => {
     // Back to front, so earlier replacements don't shift later ones.
-    [...liveSuggestions].reverse().filter((sug) => types.includes(sug.type)).forEach(accept);
+    [...liveSuggestions].reverse().filter((sug) => !sug.flag && types.includes(sug.type)).forEach(accept);
   };
 
   // ─── Re-read ───────────────────────────────────────────────────
@@ -266,6 +276,13 @@ export function ChapterWorkspace(p: Props) {
             <aside className="border-t border-line bg-paper/60 px-5 py-5 text-sm xl:rounded-br-xl xl:border-t-0 xl:border-l">
               <p className="font-medium text-muted">What I understood happened</p>
               <p className="mt-2 leading-relaxed">{p.review.summary}</p>
+              {p.review.dropOff && (
+                <div className="mt-4 border-t border-line pt-4" data-testid="drop-off">
+                  <p className="font-medium text-muted">Where my attention dipped</p>
+                  <p className="mt-2 font-serif italic">“{p.review.dropOff.quote}”</p>
+                  <p className="mt-1 leading-relaxed">{p.review.dropOff.why}</p>
+                </div>
+              )}
             </aside>
           </div>
         </details>
@@ -306,9 +323,9 @@ export function ChapterWorkspace(p: Props) {
                   onClick={runGrammar}
                   disabled={grammar.state === "checking"}
                   className="h-8 rounded-md px-2 text-sm hover:bg-line/60 disabled:opacity-50"
-                  title="Check spelling, grammar and style"
+                  title="Fix spelling, grammar and punctuation, and flag lines worth a second look"
                 >
-                  {grammar.state === "checking" ? "Checking…" : "✓ Grammar & style"}
+                  {grammar.state === "checking" ? "Checking…" : "✓ Proofread"}
                 </button>
               }
             />
@@ -321,7 +338,7 @@ export function ChapterWorkspace(p: Props) {
             {(
               [
                 ["notes", `Reader notes${notes.length ? ` (${notes.length})` : ""}`],
-                ["grammar", `Grammar & style${grammar.state === "done" ? ` (${liveSuggestions.length})` : ""}`],
+                ["grammar", `Proofread${grammar.state === "done" ? ` (${liveSuggestions.length})` : ""}`],
               ] as const
             ).map(([k, label]) => (
               <button
@@ -509,7 +526,7 @@ const SUG_LABEL: Record<string, string> = {
   clarity: "Clarity",
   style: "Style",
 };
-const MECHANICAL = ["spelling", "grammar", "punctuation"];
+const MECHANICAL = Object.keys(SUG_LABEL).filter(isMechanical);
 
 function GrammarPanel(props: {
   state: { state: "idle" | "checking" | "done" | "error"; message?: string; found?: number };
@@ -525,9 +542,12 @@ function GrammarPanel(props: {
   if (state.state === "idle") {
     return (
       <Card className="text-sm">
-        <p>Check this chapter for spelling, grammar, punctuation and a few line edits. Your voice and dialogue are left alone.</p>
+        <p>
+          Fix spelling, grammar and punctuation, and flag a few lines worth a second look. Typos can be fixed in one click; flagged lines are
+          yours to rewrite. Your voice and dialogue are left alone.
+        </p>
         <button onClick={props.onRun} className={`${buttonClass} mt-3`}>
-          Check grammar &amp; style
+          Proofread this chapter
         </button>
       </Card>
     );
@@ -543,7 +563,7 @@ function GrammarPanel(props: {
       </Card>
     );
   }
-  const mechanical = suggestions.filter((sug) => MECHANICAL.includes(sug.type)).length;
+  const mechanical = suggestions.filter((sug) => !sug.flag && MECHANICAL.includes(sug.type)).length;
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
@@ -570,20 +590,35 @@ function GrammarPanel(props: {
           className={`rounded-xl border bg-card p-4 text-sm transition ${props.active === sug.id ? "border-accent shadow-sm" : "border-line"}`}
         >
           <button onClick={() => props.onFocus(sug)} className="block w-full text-left">
-            <span className="text-xs font-medium text-reaction">{SUG_LABEL[sug.type] ?? sug.type}</span>
-            <span className="mt-1 block font-serif">
-              <del className="text-muted decoration-danger/60">{sug.quote}</del>{" "}
-              <span aria-hidden>→</span> <ins className="no-underline text-ink">{sug.replacement || "(remove)"}</ins>
+            <span className="text-xs font-medium text-reaction">
+              {SUG_LABEL[sug.type] ?? sug.type}
+              {sug.flag && <span className="font-normal text-muted"> · worth a second look</span>}
             </span>
+            {sug.flag ? (
+              <span className="mt-1 block font-serif italic text-ink">“{sug.quote}”</span>
+            ) : (
+              <span className="mt-1 block font-serif">
+                <del className="text-muted decoration-danger/60">{sug.quote}</del>{" "}
+                <span aria-hidden>→</span> <ins className="no-underline text-ink">{sug.replacement || "(remove)"}</ins>
+              </span>
+            )}
           </button>
           <p className="mt-1.5 text-muted">{sug.explanation}</p>
           <div className="mt-2 flex gap-3 text-xs">
-            <button onClick={() => props.onAccept(sug)} className="font-medium text-praise hover:underline">
-              Accept
-            </button>
-            <button onClick={() => props.onDismiss(sug)} className="text-muted hover:text-ink">
-              Dismiss
-            </button>
+            {sug.flag ? (
+              <button onClick={() => props.onDismiss(sug)} className="font-medium text-accent hover:underline">
+                Got it
+              </button>
+            ) : (
+              <>
+                <button onClick={() => props.onAccept(sug)} className="font-medium text-praise hover:underline">
+                  Accept
+                </button>
+                <button onClick={() => props.onDismiss(sug)} className="text-muted hover:text-ink">
+                  Dismiss
+                </button>
+              </>
+            )}
           </div>
         </div>
       ))}
@@ -738,6 +773,7 @@ function NoteCard({ note, active, missing, onFocus, manuscriptId, chapterId }: {
   chapterId: string;
 }) {
   const [pending, start] = useTransition();
+  const [asking, setAsking] = useState(false);
   const set = (status: NoteView["status"]) => start(() => setNoteStatus(note.id, status));
   const ask = `About this passage: "${note.quote}"\n\nYou said: ${note.comment}\n\n`;
 
@@ -756,10 +792,19 @@ function NoteCard({ note, active, missing, onFocus, manuscriptId, chapterId }: {
         “{note.quote}”
         {missing && <span className="not-italic"> (this passage has changed)</span>}
       </button>
+      {note.conflict && (
+        <p className="mt-2 text-xs text-muted">
+          Established in{" "}
+          <Link href={`/manuscripts/${manuscriptId}/chapters/${note.conflict.chapter}`} className="underline hover:text-ink">
+            chapter {note.conflict.chapter}
+          </Link>
+          : <span className="text-ink">{note.conflict.fact}</span>
+        </p>
+      )}
       <p className="mt-2">{note.comment}</p>
       {note.suggestion && (
         <p className="mt-2 rounded-lg bg-praise-soft/60 p-2.5">
-          <b className="text-praise">Try: </b>
+          <b className="text-praise">How to approach it: </b>
           {note.suggestion}
         </p>
       )}
@@ -780,15 +825,22 @@ function NoteCard({ note, active, missing, onFocus, manuscriptId, chapterId }: {
             Reopen
           </button>
         )}
-        {FEATURES.editorChat && (
-          <Link
-            href={`/manuscripts/${manuscriptId}/editor?chapter=${chapterId}&q=${encodeURIComponent(ask)}`}
-            className="ml-auto text-accent hover:underline"
-          >
-            Ask the editor
-          </Link>
+        {FEATURES.noteChat ? (
+          <button onClick={() => setAsking((a) => !a)} className="ml-auto text-accent hover:underline" aria-expanded={asking}>
+            {asking ? "Close" : note.discussed ? "Your questions" : "Ask about this"}
+          </button>
+        ) : (
+          FEATURES.editorChat && (
+            <Link
+              href={`/manuscripts/${manuscriptId}/editor?chapter=${chapterId}&q=${encodeURIComponent(ask)}`}
+              className="ml-auto text-accent hover:underline"
+            >
+              Ask the editor
+            </Link>
+          )
         )}
       </div>
+      {asking && <NoteThread noteId={note.id} />}
     </div>
   );
 }

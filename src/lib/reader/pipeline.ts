@@ -318,8 +318,11 @@ async function readChapter(args: {
         quote: c.quote,
         startOffset: anchor?.start ?? null,
         endOffset: anchor?.end ?? null,
-        comment: earlier ? `${c.explanation} (Earlier, in chapter ${earlier.chapter}: ${earlier.fact})` : c.explanation,
+        comment: c.explanation,
         suggestion: c.suggestion ?? null,
+        // Kept apart from the comment so the continuity ledger can show "established → contradicted".
+        conflictFact: earlier?.fact ?? null,
+        conflictChapter: earlier?.chapter ?? null,
       });
     }
     const facts: Prisma.StoryFactCreateManyInput[] = data.facts.map((f) => ({
@@ -352,10 +355,15 @@ async function readChapter(args: {
                 : [];
             }),
           }
-        : previousIssues.length
+        : // A re-read (the chapter had a finished read before) always gets a revision check, even with
+          // no earlier issues, so the engagement change and "revised, not new" show up for drafts.
+          previousIssues.length || before?.status === "DONE"
           ? { previousEngagement, notes: [] }
           : null;
     const intentCheck = chapter.intent?.trim() && data.intentCheck ? { intent: chapter.intent.trim(), ...data.intentCheck } : null;
+    // Only keep a drop-off point we can find on the page; a paraphrase can't be shown on the reader map.
+    const dropOff = data.dropOff && findQuote(text, data.dropOff.quote, 0) ? { quote: data.dropOff.quote, why: data.dropOff.why } : null;
+    const draft = (await db.manuscript.findUnique({ where: { id: chapter.manuscriptId }, select: { draft: true } }))?.draft ?? null;
 
     await db.$transaction([
       db.note.deleteMany({ where: { reviewId: review.id } }),
@@ -382,6 +390,8 @@ async function readChapter(args: {
           memory: data.memory,
           intentCheck: intentCheck ?? Prisma.DbNull,
           revisionCheck: revisionCheck ?? Prisma.DbNull,
+          dropOff: dropOff ?? Prisma.DbNull,
+          draft,
           model: MODEL,
           inputTokens: usage.input,
           outputTokens: usage.output,

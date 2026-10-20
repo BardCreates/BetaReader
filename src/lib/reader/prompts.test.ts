@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { castBlock, chapterUserPrompt, readerSystemPrompt } from "./prompts";
+import { castBlock, chapterUserPrompt, noteDiscussionPrompt, readerSystemPrompt } from "./prompts";
 
 const base = { index: 2, total: 10, title: "Ashes", content: "She opened the letter.", memory: "Mara, a letter." };
 
@@ -66,4 +66,57 @@ test("pronoun guidance lists each character and goes in the reader's brief", () 
   assert.equal(castBlock([]), "");
   const system = readerSystemPrompt({ title: "T", genre: null, audience: null, authorGoals: null, persona: "enthusiast", chapterCount: 3, cast });
   assert.ok(system.includes(`Mara Holt (also "Mara"): she/her`));
+});
+
+test("the reader never writes replacement prose", () => {
+  const system = readerSystemPrompt({ title: "T", genre: null, audience: null, authorGoals: null, persona: "enthusiast", chapterCount: 3 });
+  assert.match(system, /You read; you never write/);
+  assert.doesNotMatch(system, /short example rewrite is fine/);
+});
+
+test("a note discussion is anchored to the note and the chapter, and keeps the reader in order", () => {
+  const p = noteDiscussionPrompt(
+    { title: "T", genre: "Fantasy", audience: null, authorGoals: null, persona: "enthusiast", chapterCount: 20 },
+    {
+      chapterNumber: 19,
+      chapterTitle: "The Tower",
+      content: "Saul took the tower stairs two at a time.",
+      memoryBefore: "Saul was wounded in the ambush.",
+      reaction: "I was thrown by Saul running.",
+      intent: "Show Saul pushing through pain.",
+      note: {
+        kind: "ISSUE",
+        category: "continuity",
+        quote: "Saul took the tower stairs two at a time.",
+        comment: "His leg was wounded.",
+        suggestion: "Establish the healing, or show the limp.",
+        status: "DISMISSED",
+        conflict: { fact: "Saul's left leg is badly wounded.", chapter: 3 },
+      },
+    },
+  );
+  assert.match(p, /while reading chapter 19 you left the note below/);
+  assert.match(p, /Passage: "Saul took the tower stairs two at a time\."/);
+  assert.match(p, /status: the author disagreed with it/);
+  assert.match(p, /contradicts \(chapter 3\): Saul's left leg is badly wounded\./);
+  assert.match(p, /only know the book up to the end of chapter 19/);
+  assert.match(p, /don't draft replacement sentences/);
+  assert.ok(p.indexOf("<author_intent>") > -1 && p.indexOf("<chapter>") > p.indexOf("<your_note>"));
+});
+
+test("a note discussion for chapter 1 has no reader memory block", () => {
+  const p = noteDiscussionPrompt(
+    { title: "T", genre: null, audience: null, authorGoals: null, persona: "enthusiast", chapterCount: 3 },
+    {
+      chapterNumber: 1,
+      chapterTitle: "One",
+      content: "Text.",
+      memoryBefore: null,
+      reaction: null,
+      intent: null,
+      note: { kind: "PRAISE", category: "voice", quote: "Text.", comment: "Lovely.", suggestion: null, status: "OPEN" },
+    },
+  );
+  assert.doesNotMatch(p, /<reader_memory>/);
+  assert.doesNotMatch(p, /<author_intent>/);
 });

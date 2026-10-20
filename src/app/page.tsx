@@ -21,12 +21,14 @@ export default async function Home() {
         {/* Hero: the promise, and a page the reader has marked up. */}
         <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-10 pb-20 sm:px-8 md:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
           <div>
+            <p className="mb-4 text-sm font-medium tracking-wide text-pen uppercase">AI that reads, never writes</p>
             <h1 className="font-serif text-[2.6rem] leading-[1.08] font-semibold tracking-[-0.015em] sm:text-[3.4rem]">
               An honest first reader for your manuscript.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted">
-              {BRAND.name} reads your book chapter by chapter, the way a real reader would. It tells you where it was hooked, where it drifted,
-              what it guessed too early, and how to fix what isn’t working. And when you’re stuck, you can ask your characters.
+              {BRAND.name} reads your book chapter by chapter, the way a real reader would. It quotes the passage where it was hooked, where it
+              drifted and what it guessed too early, and explains what isn’t working. You write the fix. And when you’re stuck, interview your
+              characters.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link href={start} className={`${buttonClass} px-5 py-2.5 text-base`}>
@@ -89,7 +91,7 @@ export default async function Home() {
               <Feature title="The reader’s journey" text="Every question it wondered and every twist it guessed, from the chapter it came up to the chapter you settled it. And the ones you never did.">
                 <JourneyDemo />
               </Feature>
-              <Feature title="Continuity, checked" text="It keeps a story bible as it reads, and flags the passage when a later chapter contradicts an earlier one.">
+              <Feature title="Catches what a chatbot can’t" text="It keeps a ledger of every fact as it reads, so it catches the contradiction sixteen chapters later, the kind you’d never spot pasting one chapter at a time into a chatbot.">
                 <ContinuityDemo />
               </Feature>
               <Feature title="Proof a revision worked" text="Revise a chapter and it reads it again, checks each problem it raised, and tells you whether it wants to keep reading now.">
@@ -103,15 +105,15 @@ export default async function Home() {
         <section className="border-t border-line">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 sm:px-8 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
             <div>
-              <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Talk with your characters.</h2>
+              <h2 className="font-serif text-3xl leading-tight font-semibold sm:text-[2.2rem]">Interview your cast.</h2>
               <p className="mt-4 text-lg leading-relaxed text-muted">
-                Stuck on a scene? Not sure why she’d say that? Ask her. Your characters answer in their own voice, drawing on every page they appear
-                on, so you can interview them, test a scene before you write it, or find the backstory you haven’t figured out yet.
+                Not sure why she’d say that? Ask her. Your characters answer in their own voice from every page they appear on, so you can
+                interrogate a motivation, stress-test a backstory, or find the line they’d never cross, and see exactly where the page goes quiet.
               </p>
               <ul className="mt-7 space-y-4">
                 {[
-                  ["They stay true to your book.", "Each character knows the passages they’re in and the profile you’ve written, and won’t contradict the page."],
-                  ["You can see what’s new.", "Anything they invent beyond your manuscript is highlighted, so you always know canon from brainstorm."],
+                  ["They only know what your book says.", "Each character knows the passages they’re in, the facts the reader’s ledger has on them and the profile you’ve written, and won’t contradict the page."],
+                  ["You can see the gaps.", "Anything that goes beyond your manuscript is highlighted, so you know exactly what the page hasn’t established yet."],
                   ["Meet them at any point in the story.", "Limit what they know to a chapter and talk to who they were back then."],
                   ["Keep what’s useful.", "Save a good answer to their profile in one click, and it becomes part of who they are."],
                 ].map(([t, d]) => (
@@ -121,7 +123,7 @@ export default async function Home() {
                 ))}
               </ul>
               <Link href={start} className={`${buttonClass} mt-8 px-5 py-2.5`}>
-                {signedIn ? "Talk to your characters" : "Meet your characters"}
+                {signedIn ? "Interview your characters" : "Meet your characters"}
               </Link>
             </div>
             <ChatDemo />
@@ -151,11 +153,11 @@ export default async function Home() {
           <div className="mt-10 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
             {[
               ["An editorial letter", "A developmental read of the whole book: what it is, what’s working, and the biggest opportunities in priority order, with a revision plan."],
-              ["Notes on the page", "Reactions, praise and problems anchored to the exact passage, each problem with a concrete way to fix it. Mark them fixed as you go."],
-              ["A story bible", "The facts your book establishes, gathered as it reads: who’s who, injuries, ages, places, timeline and the rules of your world."],
-              ["Three kinds of reader", "Choose a devoted genre reader, a developmental editor for structure and stakes, or a line editor for voice and prose."],
-              ["A pitch kit", "A logline, back-cover blurb, synopsis and query letter drafted from how the book actually read, plus what made it hard to pitch."],
-              ["A place to write", "A clean editor with your chapters in a book outline, the reader’s notes beside the text, and grammar and style suggestions when you want them."],
+              ["Notes on the page", "Reactions, praise and problems anchored to the exact passage, each problem with a way to approach it. Mark them fixed as you go."],
+              ["A continuity ledger", "Every fact your book establishes, where it was set up, and where a later chapter contradicts it. It carries over from draft to draft."],
+              ["A reader map", "How much the reader wanted to keep going after every chapter, and the exact passage where its attention dipped."],
+              ["Argue with any note", "Ask the reader why it flagged a passage, tell it what you intended, and it re-checks the page. It changes its mind when you’re right."],
+              ["A place to revise", "Your chapters in a book outline with the reader’s notes beside the text, and a proofread that fixes typos and flags lines worth a second look."],
             ].map(([t, d]) => (
               <div key={t} className="border-l-2 border-line pl-5">
                 <h3 className="font-serif text-lg font-semibold">{t}</h3>
@@ -170,10 +172,10 @@ export default async function Home() {
         <section className="border-t border-line">
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-20 sm:px-8 md:grid-cols-2">
             <div>
-              <h2 className="font-serif text-3xl leading-tight font-semibold">Keep writing where you write.</h2>
+              <h2 className="font-serif text-3xl leading-tight font-semibold">The beta reader that lives next to Dabble.</h2>
               <p className="mt-4 text-lg text-muted">
-                Most authors already have a home for their draft. Keep it. Export a .docx whenever you like and {BRAND.name} matches it to your chapters,
-                keeps every note on what you didn’t change, and reads only what did.
+                Keep writing in Dabble, Word or wherever your draft lives. Export a .docx whenever you like and {BRAND.name} matches it to your
+                chapters, keeps every note on what you didn’t change, reads only what did, and shows you what the new draft fixed.
               </p>
             </div>
             <UpdateDemo />
@@ -266,7 +268,7 @@ const PRINCIPLES: [string, string][] = [
   ],
   [
     "Notes, not scores.",
-    "No grades, no readability numbers. Every note quotes the exact passage, says what it did to the reader, and offers a way to fix it.",
+    "No grades, no readability numbers. Every note quotes the exact passage, says what it did to the reader, and explains how to approach a fix.",
   ],
   [
     "Built for the second draft.",
@@ -274,7 +276,7 @@ const PRINCIPLES: [string, string][] = [
   ],
   [
     "It reads. It never writes your book.",
-    "Readthrough doesn’t generate chapters or rewrite your prose. Suggestions stay suggestions, and your book stays in your voice.",
+    "No generate buttons and no rewrites. It quotes your passage and explains the problem; you write the fix, so your book stays in your voice.",
   ],
   [
     "Words, not credits.",
@@ -288,20 +290,28 @@ const FAQ: [string, string][] = [
     "Only you. Manuscripts, notes and reports are private to your account, and you can delete a manuscript and everything about it at any time.",
   ],
   [
+    "Is my manuscript used to train AI?",
+    "No. The reader is Claude, made by Anthropic, and Anthropic’s commercial terms forbid training its models on what we send it. Readthrough doesn’t train anything on your book either.",
+  ],
+  [
+    "Will it rewrite my book?",
+    "No. Beyond one-click typo fixes, nothing writes for you. The reader quotes your passage, explains what isn’t working and how you might approach it, and the words stay yours. You can argue with any note, and it re-checks the page.",
+  ],
+  [
     "Is this a replacement for human beta readers or an editor?",
     "It’s a first reader you can use as often as you like: before you share a draft with people, and after every revision. It’s honest and specific, but it’s one reader’s experience. Use it to send people a stronger draft.",
   ],
   [
     "Will it just tell me my book is wonderful?",
-    "No. It’s built to be honest: it names what isn’t working, quotes the passage, and suggests a fix, alongside what’s working so you don’t revise it away.",
+    "No. It’s built to be honest: it names what isn’t working, quotes the passage, and explains how to approach it, alongside what’s working so you don’t revise it away.",
   ],
   [
     "Does it know what happens later in my book?",
     "Not while it reads. Like a real reader, it only knows the chapters it has read so far, which is how it can tell you what you gave away too early and what never paid off.",
   ],
   [
-    "How does talking with my characters work?",
-    "Open a character (Readthrough finds them in your manuscript, or you add them) and ask them anything. They answer in their own voice from the pages they appear on and the profile you’ve written, mark anything they invent, and can be limited to what they knew at a given chapter. Start a message with “OOC:” to step outside the story and talk about them as a writer.",
+    "How do character interviews work?",
+    "Open a character (Readthrough finds them in your manuscript, or you add them) and interview them, freely or with a guided mode: interrogate a motivation, stress-test a backstory, or ask what they’d never do. They answer in their own voice from the pages they appear on and the profile you’ve written, highlight anything the page doesn’t establish, and can be limited to what they knew at a given chapter. Start a message with “OOC:” to step outside the story and talk about them as a writer.",
   ],
   [
     "Which files can I upload?",
@@ -460,10 +470,12 @@ function JourneyDemo() {
 function ContinuityDemo() {
   return (
     <div className="text-sm">
-      <p className="font-serif italic">“Saul took the tower stairs two at a time.”</p>
-      <p className="mt-2 text-muted">Chapter 12</p>
+      <p className="text-xs text-muted">Established in chapter 3</p>
+      <p className="mt-0.5">Saul’s left leg is badly wounded in the ambush.</p>
+      <p className="mt-3 text-xs text-muted">Contradicted in chapter 19</p>
+      <p className="mt-0.5 font-serif italic">“Saul took the tower stairs two at a time.”</p>
       <p className="mt-3 rounded-lg bg-issue-soft px-3 py-2.5">
-        <b className="text-issue">Continuity.</b> Saul’s leg was badly wounded in chapter 9, and nothing since says it healed.
+        <b className="text-issue">Continuity.</b> Nothing since chapter 3 says the leg healed.
       </p>
     </div>
   );

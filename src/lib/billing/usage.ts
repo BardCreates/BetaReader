@@ -64,9 +64,9 @@ function limitMessage(u: UsageRow, metric: Metric, amount: number) {
         ? `This needs ${fmt(amount)} words of reading, and you have ${fmt(r.total)} left${plan.id === "free" ? " on the free plan" : " this month"}.${resets} ${more}`
         : `You've used ${plan.id === "free" ? `your ${fmt(r.allowance)} free words` : "this month's reading allowance"}.${resets} ${more}`;
     case "grammarWords":
-      return `Grammar & style checks are limited to ${fmt(r.allowance)} words ${plan.id === "free" ? "on the free plan" : "a month"}, and this chapter is ${fmt(amount)} words with ${fmt(r.total)} left.${resets} ${more}`;
+      return `Proofreading is limited to ${fmt(r.allowance)} words ${plan.id === "free" ? "on the free plan" : "a month"}, and this chapter is ${fmt(amount)} words with ${fmt(r.total)} left.${resets} ${more}`;
     case "chat":
-      return `You've used your ${fmt(r.allowance)} character chat messages${plan.id === "free" ? "" : " for this month"}.${resets} ${more}`;
+      return `You've used your ${fmt(r.allowance)} messages for character interviews and questions about notes${plan.id === "free" ? "" : " this month"}.${resets} ${more}`;
     case "pitchKits":
       return `You've written ${plan.id === "free" ? "your free pitch kit" : `this month's ${fmt(r.allowance)} pitch kits`}.${resets} ${more}`;
   }

@@ -1,6 +1,8 @@
 # Readthrough
 
-An AI beta reader and developmental editor for authors. Upload a manuscript and it reads the book **in order, chapter by chapter**, the way a real first reader would: where it was hooked, where it drifted, what confused it, what it's dying to know. Every reaction and issue is anchored to the exact passage, with a concrete suggestion for the fix. When it finishes, it writes a whole-book editorial letter and revision plan. Revise a chapter in the app and it's re-read with the memory of everything before it.
+An AI beta reader for authors: **AI that reads, never writes.** Upload a manuscript and it reads the book **in order, chapter by chapter**, the way a real first reader would: where it was hooked, where it drifted, what confused it, what it's dying to know. Every reaction and issue is anchored to the exact passage, with an explanation of how to approach the fix; the author writes the fix. When it finishes, it writes a whole-book editorial letter and revision plan. Bring back the next draft and it reads only what changed and shows what the revision fixed.
+
+v1 is the loop **read → continuity ledger → re-import → draft changes**. Product positioning and the reasons behind v1's scope are in the competitive brief (claude.ai Project doc `claude/competitive-brief.md`).
 
 ## Brand
 
@@ -23,14 +25,18 @@ upload (.docx/.txt/.md or paste)
 - **Personas.** Genre reader, developmental editor, or line editor (`src/lib/reader/personas.ts`). Same honesty rules, different lens.
 - **Reader journey.** Every question and prediction the reader carries is tracked from the chapter it came up in to the chapter that settled it (`ReaderThread`). The journey page shows what was never answered, which twists were seen coming, and which surprised them.
 - **Intent check.** Authors note what a chapter should do; the reader sees it only after forming its own reaction and reports whether it landed.
-- **Revision check.** Re-reading a chapter checks each earlier issue (fixed / partly / still there) and compares engagement.
-- **Grammar & style.** On demand, on a smaller model (`ANTHROPIC_LINE_MODEL`); suggestions are underlined in the editor with accept/dismiss (`src/lib/reader/lineEdit.ts`).
-- **Character chat.** Characters are found in the manuscript (or added by hand) and talk in voice, grounded in the passages they appear in (`src/lib/reader/characterContext.ts`); invented details are marked ⟦like this⟧; knowledge can be limited to a chapter; replies can be saved to the character's notes.
+- **Reads, never writes.** `CORE_PRINCIPLES` (src/lib/reader/prompts.ts) forbid replacement prose: notes, report fixes and continuity suggestions describe an approach, never a rewrite. There are no generate or rewrite buttons.
+- **Reader map.** Each read records the passage where attention dipped most (`ChapterReview.dropOff`, only kept if the quote is found on the page). `/manuscripts/[id]/map` shows engagement per chapter with that passage and marks likely drop points (`src/lib/reader/dropOff.ts`).
+- **Revision check.** Re-reading a chapter checks each earlier issue (fixed / partly / still there) and compares engagement. Every re-read records a revision check, even with no earlier issues.
+- **Draft changes.** Each re-import that changes anything bumps `Manuscript.draft` and records a `Draft` row (titles changed / added / removed); each read stamps `ChapterReview.draft`. `/manuscripts/[id]/drafts` compares the current draft's reads with the last (`compareDraft` in src/lib/manuscript/drafts.ts): issues fixed, engagement moves, continuity problems, and changed chapters not read yet.
+- **Ask about a note.** `FEATURES.noteChat`. Each note has one conversation (`Conversation.noteId`) where the author can question or argue with it; the reader sees the note, that chapter and its memory going in, and still can't see later chapters (`noteDiscussionPrompt`, src/app/api/notes/[nid]/ask). Uses the chat allowance; usage kind `discuss`. Conversations go when the note does (a re-read replaces a chapter's notes).
+- **Proofread.** On demand, on a smaller model (`ANTHROPIC_LINE_MODEL`). Only spelling, grammar and punctuation come with a one-click fix; word choice, repetition, clarity and style are flags with no replacement, for the author to rewrite (`src/lib/reader/lineSuggestions.ts`).
+- **Interview your cast.** Characters are found in the manuscript (or added by hand) and answer in voice, grounded in the passages they appear in (`src/lib/reader/characterContext.ts`) and the story-bible facts about them (`factsAbout`); anything the page doesn't establish is marked ⟦like this⟧ and shown as a gap. Guided modes (interrogate a motivation, stress-test a backstory, what they'd never do) live in `src/lib/reader/interview.ts` and are stored per conversation (`Conversation.mode`). Knowledge can be limited to a chapter; replies can be saved to the character's notes.
 - **Editor chat (off in v1).** Switched off in `src/lib/features.ts` to keep v1 focused on the read; flip `editorChat` to bring it back. Streams replies with the book report, chapter summaries and (for chapter conversations) the full chapter text and notes in context (`src/lib/reader/editor.ts`).
 - **Update from a new draft.** Revise in Dabble, Word or Google Docs, export, and upload the new version (`/manuscripts/[id]/update`). Chapters are matched to the existing ones in order, by shared text and title (`src/lib/manuscript/match.ts`), so inserted, removed and renamed chapters line up; you see a preview before anything changes. Unchanged chapters keep their notes and reads; **Read the changes** reads only new and edited chapters, then refreshes the report.
-- **Continuity & story bible.** Each read records the concrete facts a chapter establishes (`StoryFact`: traits, injuries, timeline, places, rules of the world) and checks the chapter against facts from earlier chapters only. Contradictions become `continuity` notes anchored to the passage, citing the earlier fact. `/manuscripts/[id]/bible` lists the problems and the facts by subject.
-- **Pitch kit.** After a full read: logline, back-cover blurb, synopsis, query letter, selling points, comp suggestions, and honest notes on what made the book hard to pitch (`src/lib/reader/pitch.ts`, `/manuscripts/[id]/pitch`). Built from the read's summaries and report, not the full text, so it's cheap.
-- **Write in the app.** A left menu lists every chapter like a book outline. Each chapter opens in an editor (paragraphs, bold, italic, scene breaks) that autosaves. The reader's notes stay beside the text and their highlights follow your edits; chapters you've changed since their last read are marked, and **Re-read this chapter** gets fresh feedback when you're ready. Chapters are stored as formatted documents (`Chapter.doc`) with a plain-text copy (`Chapter.content`) that the AI reads and notes anchor to — see `src/lib/manuscript/doc.ts`.
+- **Continuity ledger.** Each read records the concrete facts a chapter establishes (`StoryFact`: traits, injuries, timeline, places, rules of the world) and checks the chapter against facts from earlier chapters only. Contradictions become `continuity` notes anchored to the passage, with the earlier fact and its chapter stored on the note (`conflictFact`, `conflictChapter`). `/manuscripts/[id]/bible` shows each problem as established → contradicted, settled ones, and the facts by subject.
+- **Pitch kit (deferred).** Off in v1 via `FEATURES.pitchKit`: it writes prose for the author. Logline, blurb, synopsis, query letter, comps and pitch notes (`src/lib/reader/pitch.ts`, `/manuscripts/[id]/pitch`); flip the switch to bring it back.
+- **Revise in the app.** A left menu lists every chapter like a book outline. Each chapter opens in an editor (paragraphs, bold, italic, scene breaks) that autosaves. The reader's notes stay beside the text and their highlights follow your edits; chapters you've changed since their last read are marked, and **Re-read this chapter** gets fresh feedback when you're ready. Chapters are stored as formatted documents (`Chapter.doc`) with a plain-text copy (`Chapter.content`) that the AI reads and notes anchor to — see `src/lib/manuscript/doc.ts`.
 
 ## Stack
 
@@ -59,7 +65,7 @@ Run `npm run update`. It installs any new packages, applies new database migrati
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | Start the dev server |
-| `npm test` | Unit tests (chapter splitting, quote anchoring) |
+| `npm test` | Unit tests (splitting, anchoring, matching, drafts, prompts, billing) |
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build |
 | `npm run db:migrate` | Create/apply a Prisma migration in development |
@@ -81,8 +87,11 @@ src/app/manuscripts/[id]        overview + book report
 src/app/manuscripts/[id]/chapters/[n]   chapter text with inline notes
 src/app/manuscripts/[id]/editor          editor conversations
 src/app/manuscripts/[id]/update          update from a new draft (preview + apply)
-src/app/manuscripts/[id]/bible           story bible + continuity problems
-src/app/manuscripts/[id]/pitch           pitch kit
+src/app/manuscripts/[id]/map             reader map (engagement + drop-off passages)
+src/app/manuscripts/[id]/drafts          draft changes (this draft vs the last)
+src/app/manuscripts/[id]/bible           continuity ledger + story bible
+src/app/manuscripts/[id]/pitch           pitch kit (off in v1)
+src/app/api/notes/[nid]/ask              ask the reader about one note (streaming)
 src/lib/manuscript              import, chapter splitting, quote anchoring (+ tests)
 src/lib/reader                  prompts, personas, schemas, pipeline, editor context
 src/lib/plans.ts                plan limits (free / author / pro)

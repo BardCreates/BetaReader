@@ -91,9 +91,10 @@ function NoteHighlights(onAnchors: (found: Set<string>) => void) {
   });
 }
 
-// ─── Grammar & style suggestions ─────────────────────────────────
+// ─── Proofread suggestions ───────────────────────────────────────
 
-export type Suggestion = { id: string; quote: string; replacement: string; type: string; explanation: string };
+/** `flag`: a line worth a second look, for the author to rewrite (no replacement to apply). */
+export type Suggestion = { id: string; quote: string; replacement: string; type: string; explanation: string; flag?: boolean };
 
 type SuggestionMeta = { set: Suggestion[] } | { remove: string };
 const suggestionKey = new PluginKey<DecorationSet>("lineSuggestions");
