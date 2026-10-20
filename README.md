@@ -50,6 +50,10 @@ npm run dev
 
 Open http://localhost:3000, sign in with the dev email login (enabled by `AUTH_DEV_LOGIN=true`, development only), and upload a manuscript.
 
+### After pulling changes
+
+Run `npm run update`. It installs any new packages, applies new database migrations, and regenerates the database client. (`npm run dev` also regenerates the client on start.)
+
 ### Scripts
 
 | Script | What it does |

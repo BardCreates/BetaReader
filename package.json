@@ -5,6 +5,7 @@
   "description": "An AI beta reader and developmental editor for authors.",
   "type": "module",
   "scripts": {
+    "predev": "prisma generate",
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
@@ -13,7 +14,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "update": "npm install && prisma migrate deploy && prisma generate"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
