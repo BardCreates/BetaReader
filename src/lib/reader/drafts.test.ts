@@ -113,3 +113,11 @@ test("snapshotChapter marks edited-after-read chapters stale and drops dismissed
   assert.deepEqual([s.issues.length, s.continuity.length], [1, 1]);
   assert.deepEqual(s.verdicts, { fixed: 1, partly: 0, stillThere: 1 });
 });
+
+test("engagement averages only cover chapters read in both drafts", () => {
+  const c = compareDrafts(
+    snap([chapter("a", 1, { engagement: 6 }), chapter("b", 2, { engagement: 4 })]),
+    snap([chapter("a", 1, { engagement: 8 }), chapter("b", 2, { engagement: 4, read: false, stale: true })], 2),
+  );
+  assert.deepEqual([c.totals.engagementBefore, c.totals.engagementAfter, c.totals.pairedChapters], [6, 8, 1]);
+});

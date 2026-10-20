@@ -154,6 +154,8 @@ export type DraftComparison = {
   totals: {
     engagementBefore: number | null;
     engagementAfter: number | null;
+    /** How many chapters the averages cover (read in both drafts). */
+    pairedChapters: number;
     issuesBefore: number;
     issuesAfter: number;
     fixed: number;
@@ -302,12 +304,15 @@ export function compareDrafts(before: SnapshotData, after: SnapshotData): DraftC
   const introduced = contAfter.filter((_, i) => !used.has(i));
 
   const live = chapters.filter((c) => c.kind !== "removed");
+  // Like for like: only chapters with a read in both drafts count towards the averages.
+  const paired = live.filter((c) => !c.awaitingRead && c.engagementBefore != null && c.engagementAfter != null);
   return {
     // Removed chapters sit just before the chapter that now holds their old position.
     chapters: chapters.sort((x, y) => position(x) - position(y)),
     totals: {
-      engagementBefore: avg(before.chapters.filter((c) => c.read || c.stale).map((c) => c.engagement)),
-      engagementAfter: avg(after.chapters.filter((c) => c.read).map((c) => c.engagement)),
+      engagementBefore: avg(paired.map((c) => c.engagementBefore)),
+      engagementAfter: avg(paired.map((c) => c.engagementAfter)),
+      pairedChapters: paired.length,
       issuesBefore: before.chapters.reduce((n, c) => n + c.issues.length, 0),
       issuesAfter: after.chapters.reduce((n, c) => n + c.issues.length, 0),
       fixed: live.reduce((n, c) => n + c.fixed.length, 0),

@@ -70,8 +70,8 @@ export function isStale(status: string, updatedAt: Date) {
  * re-running after a failure picks up where it stopped. With `rereadChanged`, chapters
  * edited since their read are read again too (the "read changes" flow after a revision).
  *
- * NOTE: this runs in-process (via `after()`). For production at scale move it to a
- * durable job runner (Inngest, Trigger.dev, a queue + worker) — see README.
+ * Runs as a background job (src/lib/jobs): queued by the web app, run by a worker, and retried
+ * if the worker dies. Safe to run again at any point.
  */
 export async function readManuscript(manuscriptId: string, opts: { rereadChanged?: boolean } = {}) {
   const ms = await db.manuscript.findUnique({

@@ -394,9 +394,11 @@ model PitchKit {
 // ─── Billing & cost control ──────────────────────────────────────
 
 // Every AI call, with its real cost. Feeds the per-user spend ceiling and the app-wide daily budget.
+// userId is null for free sample reads (no account), and once a user deletes their account:
+// the row stays, anonymous, so the day's spend is still counted.
 model AiUsage {
   id               String   @id @default(cuid())
-  userId           String
+  userId           String?
   manuscriptId     String?
   kind             String   // read | report | grammar | chat | characters | pitch | editor
   model            String
@@ -407,7 +409,7 @@ model AiUsage {
   costMicros       Int      @default(0)
   createdAt        DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([createdAt])
@@ -418,4 +420,45 @@ model StripeEvent {
   id        String   @id // Stripe event id
   type      String
   createdAt DateTime @default(now())
+}
+
+// ─── Free sample reads ───────────────────────────────────────────
+
+// One chapter read for someone without an account (/try). Deleted after TRIAL_RETENTION_DAYS.
+model TrialRead {
+  id        String        @id @default(cuid())
+  ipHash    String        // salted hash of the visitor's address, for rate limits; never the address
+  title     String?
+  genre     String?
+  content   String        @db.Text
+  wordCount Int
+  midBook   Boolean       @default(false) // from partway through the book, rather than an opening
+  status    ReadingStatus @default(QUEUED)
+  error     String?       @db.Text
+  result    Json?         // see TrialResult in src/lib/trialRead.ts
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([ipHash, createdAt])
+  @@index([createdAt])
+}
+
+// ─── Background jobs ─────────────────────────────────────────────
+
+// Long-running AI work (whole-book reads, re-reads, sample reads), run by a worker so it
+// survives restarts and request time limits. See src/lib/jobs.
+model Job {
+  id        String    @id @default(cuid())
+  kind      String    // read_manuscript | reread_chapter | pitch_kit | trial_read
+  payload   Json
+  status    String    @default("queued") // queued | running | done | failed
+  attempts  Int       @default(0)
+  runAt     DateTime  @default(now())
+  lockedAt  DateTime? // heartbeat while running; a stale one means the worker died
+  lockedBy  String?
+  error     String?   @db.Text
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([status, runAt])
 }

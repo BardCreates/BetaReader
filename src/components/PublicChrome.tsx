@@ -11,6 +11,11 @@ export function PublicHeader({ signedIn = false }: { signedIn?: boolean }) {
         <Logo />
       </Link>
       <nav className="flex items-center gap-1 text-[0.95rem] sm:gap-2">
+        {!signedIn && (
+          <Link href="/try" className="hidden rounded-lg px-3 py-1.5 whitespace-nowrap text-muted transition-colors hover:text-ink md:inline">
+            Try a chapter
+          </Link>
+        )}
         <Link href="/pricing" className="rounded-lg px-3 py-1.5 whitespace-nowrap text-muted transition-colors hover:text-ink">
           Pricing
         </Link>

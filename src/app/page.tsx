@@ -41,11 +41,28 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
               <Link href={start} className={`${buttonClass} px-5 py-2.5 text-base`}>
                 {startLabel}
               </Link>
-              <Link href="#how-it-works" className={`${ghostButtonClass} px-4 py-2.5 text-base`}>
-                How it works
-              </Link>
+              {signedIn ? (
+                <Link href="#how-it-works" className={`${ghostButtonClass} px-4 py-2.5 text-base`}>
+                  How it works
+                </Link>
+              ) : (
+                <Link href="/try" className={`${ghostButtonClass} px-4 py-2.5 text-base`}>
+                  Read a chapter free
+                </Link>
+              )}
             </div>
-            <p className="mt-4 text-sm text-muted">Your first {fmt(PLANS.free.allowance.words)} words are free. No card needed.</p>
+            <p className="mt-4 text-sm text-muted">
+              {signedIn ? (
+                <>Your first {fmt(PLANS.free.allowance.words)} words are free. No card needed.</>
+              ) : (
+                <>
+                  <Link href="/try" className="underline hover:text-ink">
+                    Paste a chapter
+                  </Link>{" "}
+                  and get notes in a minute, no sign-up. Or start free: your first {fmt(PLANS.free.allowance.words)} words are on us.
+                </>
+              )}
+            </p>
           </div>
 
           <AnnotatedPage />

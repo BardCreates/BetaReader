@@ -1,6 +1,5 @@
 "use server";
 
-import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/auth";
@@ -15,7 +14,8 @@ import { planFor } from "@/lib/plans";
 import { remaining } from "@/lib/billing/period";
 import { getUsage } from "@/lib/billing/usage";
 import { keepSnapshot } from "@/lib/reader/draftHistory";
-import { MIN_WORDS_TO_READ, claimManuscript, readManuscript } from "@/lib/reader/pipeline";
+import { scheduleJob } from "@/lib/jobs/schedule";
+import { MIN_WORDS_TO_READ, claimManuscript } from "@/lib/reader/pipeline";
 
 export type ReimportPreview = {
   changes: ChapterChange[];
@@ -169,7 +169,7 @@ export async function readChangedChapters(manuscriptId: string) {
   const claim = await claimManuscript(manuscriptId, user.id);
   if (claim === "otherBusy") redirect(`${base}?notice=busy`);
   if (claim === "claimed") {
-    after(() => readManuscript(manuscriptId, { rereadChanged: true }));
+    await scheduleJob("read_manuscript", { manuscriptId, rereadChanged: true });
   }
   revalidatePath(`/manuscripts/${manuscriptId}`, "layout");
 }

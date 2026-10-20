@@ -1,6 +1,5 @@
 "use server";
 
-import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -17,7 +16,9 @@ import { planFor } from "@/lib/plans";
 import { PERSONAS } from "@/lib/reader/personas";
 import { lineEditText, type LineSuggestion } from "@/lib/reader/lineEdit";
 import { keepSnapshot } from "@/lib/reader/draftHistory";
-import { MIN_WORDS_TO_READ, claimManuscript, readManuscript, rereadChapter } from "@/lib/reader/pipeline";
+import { toJsonReservation } from "@/lib/jobs/handlers";
+import { scheduleJob } from "@/lib/jobs/schedule";
+import { MIN_WORDS_TO_READ, claimManuscript } from "@/lib/reader/pipeline";
 
 export type FormState = { error?: string } | undefined;
 
@@ -100,8 +101,8 @@ export async function startReading(manuscriptId: string, fresh = false) {
         db.storyFact.deleteMany({ where: { manuscriptId } }),
       ]);
     }
-    // Respond immediately; the read continues after the response is sent.
-    after(() => readManuscript(manuscriptId));
+    // Respond immediately; the read runs as a background job.
+    await scheduleJob("read_manuscript", { manuscriptId });
   }
   revalidatePath(`/manuscripts/${manuscriptId}`);
 }
@@ -265,12 +266,17 @@ export async function rereadChapterNow(chapterId: string): Promise<FormState> {
     if (isLimitError(err)) return { error: err.message };
     throw err;
   }
-  await db.chapterReview.upsert({
-    where: { chapterId: chapter.id },
-    update: { status: "QUEUED", error: null },
-    create: { chapterId: chapter.id, status: "QUEUED" },
-  });
-  after(() => rereadChapter(chapter.id, reservation));
+  try {
+    await db.chapterReview.upsert({
+      where: { chapterId: chapter.id },
+      update: { status: "QUEUED", error: null },
+      create: { chapterId: chapter.id, status: "QUEUED" },
+    });
+    await scheduleJob("reread_chapter", { chapterId: chapter.id, reservation: toJsonReservation(reservation) });
+  } catch (err) {
+    await release(reservation).catch(() => {});
+    throw err;
+  }
   revalidatePath(`/manuscripts/${chapter.manuscript.id}`, "layout");
   return undefined;
 }

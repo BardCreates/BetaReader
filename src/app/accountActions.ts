@@ -34,8 +34,12 @@ export async function deleteAccount(_prev: DeleteAccountState, form: FormData): 
     }
   }
 
-  // Cascades to manuscripts and everything made from them (see prisma/schema.prisma).
-  await db.user.delete({ where: { id: user.id } });
+  // Cascades to manuscripts and everything made from them (see prisma/schema.prisma). AI usage
+  // rows are kept for the day's spend totals, but unlinked from the user and their books.
+  await db.$transaction([
+    db.aiUsage.updateMany({ where: { userId: user.id }, data: { manuscriptId: null } }),
+    db.user.delete({ where: { id: user.id } }),
+  ]);
   await signOut({ redirectTo: "/?deleted=1" });
   return undefined;
 }

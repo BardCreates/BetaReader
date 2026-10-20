@@ -72,8 +72,8 @@ export default function PrivacyPage() {
       <h2>Deleting your data</h2>
       <p>
         Deleting a manuscript removes it and everything made from it from our database straight away. Deleting your account (from your{" "}
-        <Link href="/account">account page</Link>) removes your account, every manuscript and all your usage history, and cancels any
-        subscription. Encrypted backups kept by our database provider are overwritten on their normal schedule, after which nothing remains.
+        <Link href="/account">account page</Link>) removes your account and every manuscript, and cancels any subscription. Records of AI
+        usage are kept only as anonymous cost totals, with nothing that links them to you or your writing. Encrypted backups kept by our database provider are overwritten on their normal schedule, after which nothing remains.
       </p>
       <p>
         You can also download a copy of everything you’ve given us and everything the reader made, as a single file, from the account page.

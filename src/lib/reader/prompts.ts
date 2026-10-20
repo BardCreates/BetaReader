@@ -48,7 +48,10 @@ export type PreviousIssue = { id: string; quote: string; comment: string; author
 
 export function chapterUserPrompt(args: {
   index: number;
-  total: number;
+  /** null for a free sample read: one chapter on its own, with no book around it. */
+  total: number | null;
+  /** Sample reads only: the chapter comes from partway through the book. */
+  midBook?: boolean;
   title: string;
   content: string;
   memory: string | null;
@@ -58,11 +61,13 @@ export function chapterUserPrompt(args: {
   previous?: { engagement: number | null; issues: PreviousIssue[] } | null;
 }) {
   const where =
-    args.index === 0
+    args.total === null && args.midBook
+      ? "This chapter comes from partway through the book, and you haven't read what came before. Judge it on its own terms: don't count missing background as a flaw unless the chapter itself depends on it, but do say where you were lost."
+      : args.index === 0
       ? "This is the first chapter. You know nothing about the story yet. Pay special attention to the opening hook and whether you'd keep reading past page one."
       : `Here is your memory of the story so far (from reading chapters 1–${args.index}):\n<reader_memory>\n${args.memory ?? "(none)"}\n</reader_memory>`;
   const ending =
-    args.index === args.total - 1
+    args.total !== null && args.index === args.total - 1
       ? "\nThis is the final chapter. React to the ending: does it pay off what the book promised?"
       : "";
   const threads = args.openThreads?.length
@@ -92,7 +97,7 @@ ${args.previous.issues.map((i) => `${i.id} [${i.authorStatus}] "${i.quote}" — 
 
   return `${where}${threads}${bible}
 
-Now read chapter ${args.index + 1} of ${args.total}: "${args.title}".${ending}
+${args.total === null ? `Now read this chapter: "${args.title}".` : `Now read chapter ${args.index + 1} of ${args.total}: "${args.title}".`}${ending}
 
 <chapter>
 ${args.content}

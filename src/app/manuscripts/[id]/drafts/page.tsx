@@ -108,14 +108,18 @@ export default async function DraftsPage({
           title="Wanted to keep reading"
           value={t.engagementAfter != null ? `${t.engagementAfter}` : "–"}
           delta={t.engagementBefore != null && t.engagementAfter != null ? Math.round((t.engagementAfter - t.engagementBefore) * 10) / 10 : null}
-          note={t.engagementBefore != null ? `Average per chapter, was ${t.engagementBefore}` : "Average per chapter"}
+          note={
+            t.engagementBefore != null
+              ? `Was ${t.engagementBefore}. Average of the ${t.pairedChapters} chapter${t.pairedChapters === 1 ? "" : "s"} read in both`
+              : "Average per chapter, once chapters are read in both drafts"
+          }
         />
         <Stat title="Problems fixed" value={`${t.fixed}`} tone="praise" note="Raised before, gone from the new read" />
         <Stat title="New problems" value={`${t.introduced}`} tone={t.introduced ? "issue" : undefined} note="In revised or new chapters" />
         <Stat
           title="Continuity"
           value={`${cmp.continuity.resolved.length} fixed`}
-          tone={cmp.continuity.introduced.length ? "issue" : "praise"}
+          tone={cmp.continuity.introduced.length ? "issue" : cmp.continuity.resolved.length ? "praise" : undefined}
           note={`${cmp.continuity.introduced.length} introduced · ${cmp.continuity.still} still there`}
         />
       </section>
