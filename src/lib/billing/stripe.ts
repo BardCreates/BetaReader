@@ -44,7 +44,7 @@ export function stripe(): Stripe {
     const base = process.env.STRIPE_API_BASE ? new URL(process.env.STRIPE_API_BASE) : null;
     client = new Stripe(key, {
       maxNetworkRetries: 2,
-      appInfo: { name: "Beta Reader" },
+      appInfo: { name: "Readthrough" },
       ...(base ? { host: base.hostname, port: Number(base.port), protocol: base.protocol.replace(":", "") as "http" | "https" } : {}),
     });
   }

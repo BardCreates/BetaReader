@@ -1,4 +1,4 @@
-# Beta Reader — notes for Claude
+# Readthrough (repo: BetaReader) — notes for Claude
 
 AI beta reader for authors. Next.js 16 App Router + Prisma 7/Postgres + Auth.js + Anthropic SDK. See README.md for the architecture.
 
@@ -19,4 +19,5 @@ AI beta reader for authors. Next.js 16 App Router + Prisma 7/Postgres + Auth.js 
 - Re-import: `reimportDraft` (src/app/reimportActions.ts) previews then applies a revised upload using `matchChapters` (src/lib/manuscript/match.ts). Store imported text via `canonicalText` and set `doc` from it, so it matches what the editor would save. Kept chapters are parked on negative indexes before renumbering to avoid the (manuscriptId, index) unique clash. `readManuscript(id, { rereadChanged: true })` re-reads only stale or unread chapters.
 - Continuity: `StoryFact` rows are written per chapter in `readChapter` and deleted when that chapter is re-read (like threads). The reader only ever gets facts from EARLIER chapters (capped at MAX_BIBLE_FACTS). Contradictions are saved as ISSUE notes with category "continuity".
 - Pitch kit: `writePitchKit` (src/lib/reader/pitch.ts) uses summaries, final memory and the book report, not the full manuscript. Needs a finished read.
-- Billing & limits (src/lib/billing): every AI call MUST carry a `meter` (callStructured requires it) or, for streams, record usage with `recordAiUsage` via `streamUsageTracker`. Work that consumes an allowance must `reserve()` BEFORE calling the AI and `release()` on failure. Throw/propagate `LimitError` unchanged so the UI can show the reason. Plan → subscription mapping is by Stripe price id env vars (src/lib/billing/stripe.ts). Pricing figures in `src/lib/billing/cost.ts` must match platform.claude.com pricing.
+- Billing & limits (src/lib/billing): every AI call MUST carry a `meter` (callStructured requires it) or, for streams, `holdCost()` before and `settleCost()` after with `streamUsageTracker`. Work that consumes an allowance must `reserve()` BEFORE calling the AI and `release()` on failure. Throw/propagate `LimitError` unchanged so the UI can show the reason. Plan → subscription mapping is by Stripe price id env vars (src/lib/billing/stripe.ts). Pricing figures in `src/lib/billing/cost.ts` must match platform.claude.com pricing.
+- Brand: the product name is Readthrough; use `BRAND` from src/lib/brand.ts, never hard-code it. Red (`pen` colour) is reserved for "marks" (logo bar, active nav, flagged items), not decoration. Public pages use `PublicHeader`/`PublicFooter`.

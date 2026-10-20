@@ -1,6 +1,10 @@
-# Beta Reader
+# Readthrough
 
 An AI beta reader and developmental editor for authors. Upload a manuscript and it reads the book **in order, chapter by chapter**, the way a real first reader would: where it was hooked, where it drifted, what confused it, what it's dying to know. Every reaction and issue is anchored to the exact passage, with a concrete suggestion for the fix. When it finishes, it writes a whole-book editorial letter and revision plan. Revise a chapter in the app and it's re-read with the memory of everything before it.
+
+## Brand
+
+The product is called **Readthrough** (the repository keeps its original name). The name and tagline live in `src/lib/brand.ts`; the logo mark (a manuscript page with a red margin bar beside one line) is `src/components/Logo.tsx`, with the favicon in `src/app/icon.svg`. Colours and type are tokens in `src/app/globals.css`: ink blue on a cool paper white, with the editor's red pen (`--color-pen`) used only where something is marked. Headings and prose are set in Literata; the interface in Source Sans 3.
 
 ## How it works
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PublicFooter, PublicHeader } from "@/components/PublicChrome";
 import { auth } from "@/auth";
 import { billingEnabled } from "@/lib/billing/stripe";
 import { db } from "@/lib/db";
@@ -13,15 +13,9 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
   const billingOff = (await searchParams).billing === "off";
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-4 sm:px-8">
-      <nav className="flex items-center justify-between py-6">
-        <Link href={account ? "/dashboard" : "/"} className="font-serif text-xl font-semibold">
-          Beta Reader
-        </Link>
-        <Link href={account ? "/dashboard" : "/signin"} className="text-sm text-muted hover:text-ink">
-          {account ? "Your manuscripts" : "Sign in"}
-        </Link>
-      </nav>
+    <div className="flex min-h-screen flex-col">
+    <PublicHeader signedIn={!!account} />
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-8">
 
       <header className="max-w-2xl pt-8">
         <h1 className="font-serif text-4xl font-semibold leading-tight">Pricing</h1>
@@ -57,5 +51,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         </div>
       </section>
     </main>
+    <PublicFooter />
+    </div>
   );
 }

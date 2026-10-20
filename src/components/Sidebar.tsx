@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { addChapter, signOutAction } from "@/app/actions";
+import { Logo, Mark } from "@/components/Logo";
+import { BRAND } from "@/lib/brand";
 import { FEATURES } from "@/lib/features";
 import type { ChapterState, SidebarData } from "@/lib/sidebar";
 
@@ -22,8 +24,8 @@ export function Sidebar({ email, data }: { email: string | null; data: SidebarDa
   const nav = (
     <nav className="flex h-full flex-col text-sm">
       <div className="flex items-center justify-between px-5 pt-5 pb-4">
-        <Link href="/dashboard" className="font-serif text-lg font-semibold tracking-tight text-ink">
-          Beta Reader
+        <Link href="/dashboard" aria-label={`${BRAND.name}: your manuscripts`}>
+          <Logo size="sm" />
         </Link>
         <button className="rounded p-1 text-muted hover:bg-line/60 lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
           ✕
@@ -136,10 +138,11 @@ export function Sidebar({ email, data }: { email: string | null; data: SidebarDa
     <>
       {/* Small screens: top bar with a menu button */}
       <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-card/90 px-4 py-2.5 backdrop-blur lg:hidden">
-        <button onClick={() => setOpen(true)} className="rounded-md border border-line px-2.5 py-1 text-sm" aria-label="Open menu">
-          ☰ Menu
+        <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-md border border-line px-2 py-1 text-sm" aria-label="Open menu">
+          <Mark size={18} />
+          Menu
         </button>
-        <span className="truncate font-serif font-semibold">{ms?.title ?? "Beta Reader"}</span>
+        <span className="truncate font-serif font-semibold">{ms?.title ?? BRAND.name}</span>
       </div>
       {open && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />}
 
@@ -160,10 +163,12 @@ function NavLink({ href, active, children }: { href: string; active: boolean; ch
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
+      className={`relative flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
         active ? "bg-accent-soft font-medium text-ink" : "text-ink/80 hover:bg-line/50 hover:text-ink"
       }`}
     >
+      {/* The red-pen margin mark: where you are. */}
+      {active && <span aria-hidden className="absolute top-1.5 bottom-1.5 -left-1.5 w-[3px] rounded-full bg-pen" />}
       {children}
     </Link>
   );

@@ -155,7 +155,7 @@ async function assertCapacity() {
   const budget = dailyBudgetMicros();
   if (budget === Infinity) return;
   if ((await spentTodayMicros()) >= budget) {
-    throw new LimitError("Beta Reader is at capacity for today. Please try again tomorrow; nothing you've used was charged.", "CAPACITY");
+    throw new LimitError("Readthrough is at capacity for today. Please try again tomorrow; nothing you've used was charged.", "CAPACITY");
   }
 }
 

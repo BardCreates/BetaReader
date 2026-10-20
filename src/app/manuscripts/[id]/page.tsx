@@ -29,6 +29,8 @@ export default async function ManuscriptPage({
     where: { id, userId: user.id },
     include: {
       report: true,
+      pitchKit: { select: { status: true } },
+      _count: { select: { threads: true, characters: true, facts: true } },
       chapters: {
         orderBy: { index: "asc" },
         select: {
@@ -59,6 +61,9 @@ export default async function ManuscriptPage({
   const doneCount = ms.chapters.filter((c) => c.review?.status === "DONE").length;
   const report = ms.report?.status === "DONE" ? (ms.report.content as BookReportContent) : null;
   const base = `/manuscripts/${ms.id}`;
+  const openContinuity = await db.note.count({
+    where: { category: "continuity", status: "OPEN", review: { chapter: { manuscriptId: ms.id } } },
+  });
   // Chapters the reader hasn't seen in their current form: edited since their read, or never read.
   const toRead = ms.chapters.filter(
     (c) => c.wordCount >= MIN_WORDS_TO_READ && (!c.review || c.review.status !== "DONE" || isReviewStale(c.review, c.contentUpdatedAt)),
@@ -88,11 +93,6 @@ export default async function ManuscriptPage({
                   {ms.status === "DRAFT" ? "Start reading" : ms.status === "DONE" ? "Read again" : "Resume reading"}
                 </SubmitButton>
               </form>
-            )}
-            {!busy && (
-              <Link href={`${base}/update`} className={ghostButtonClass}>
-                Update from new draft
-              </Link>
             )}
             {FEATURES.editorChat && (
               <Link href={`${base}/editor`} className={ghostButtonClass}>
@@ -188,7 +188,28 @@ export default async function ManuscriptPage({
                 />
               </Card>
             )}
-            <form action={deleteManuscript.bind(null, ms.id)}>
+            <Card className="p-2">
+              <p className="px-3 pt-2 pb-1 text-sm font-medium">Your book</p>
+              <ul>
+                <Tool href={`${base}/journey`} title="Reader journey" detail={ms._count.threads ? `${ms._count.threads} questions and predictions` : "Built during a read"} />
+                <Tool
+                  href={`${base}/bible`}
+                  title="Story bible"
+                  detail={openContinuity ? `${openContinuity} continuity problem${openContinuity === 1 ? "" : "s"}` : ms._count.facts ? `${ms._count.facts} facts, no contradictions` : "Built during a read"}
+                  alert={openContinuity > 0}
+                />
+                {FEATURES.characterChat && (
+                  <Tool href={`${base}/characters`} title="Characters" detail={ms._count.characters ? `${ms._count.characters} to talk to` : "Find them in your manuscript"} />
+                )}
+                <Tool
+                  href={`${base}/pitch`}
+                  title="Pitch kit"
+                  detail={ms.pitchKit?.status === "DONE" ? "Logline, blurb, synopsis, query" : report ? "Ready to write" : "After a full read"}
+                />
+                <Tool href={`${base}/update`} title="Update from new draft" detail="Upload a fresh export from Dabble or Word" />
+              </ul>
+            </Card>
+            <form action={deleteManuscript.bind(null, ms.id)} className="px-1">
               <SubmitButton className="text-xs text-muted hover:text-danger" confirm="Delete this manuscript and all its feedback?">
                 Delete manuscript
               </SubmitButton>
@@ -197,6 +218,20 @@ export default async function ManuscriptPage({
         </div>
       </main>
     </>
+  );
+}
+
+function Tool({ href, title, detail, alert = false }: { href: string; title: string; detail: string; alert?: boolean }) {
+  return (
+    <li>
+      <Link href={href} className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-line/40">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[0.95rem] font-medium group-hover:text-accent">{title}</span>
+          <span className={`block text-sm ${alert ? "text-issue" : "text-muted"}`}>{detail}</span>
+        </span>
+        <span aria-hidden className="text-muted transition-transform group-hover:translate-x-0.5">›</span>
+      </Link>
+    </li>
   );
 }
 

@@ -111,7 +111,7 @@ export function CharacterChat(props: {
         </span>
       </div>
 
-      <div className="flex-1 space-y-4">
+      <div className="space-y-4">
         {messages.length === 0 && (
           <Card>
             <p className="font-serif text-lg">Ask {first} anything.</p>
@@ -154,13 +154,15 @@ export function CharacterChat(props: {
 
       {error && <p className="mt-4 rounded-lg bg-danger-soft px-4 py-2 text-sm text-danger">{error}</p>}
 
+      {/* The composer sits right under the conversation and stays in view while it grows. */}
       <form
-        className="sticky bottom-0 mt-6 flex gap-2 bg-paper py-3"
+        className="sticky bottom-0 mt-4 bg-paper pt-2 pb-4"
         onSubmit={(e) => {
           e.preventDefault();
           send(draft);
         }}
       >
+        <div className="rounded-xl border border-line bg-card shadow-[0_1px_2px_rgb(0_0_0/0.04)] focus-within:border-accent">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -172,12 +174,16 @@ export function CharacterChat(props: {
           }}
           rows={Math.min(8, Math.max(2, draft.split("\n").length))}
           placeholder={`Ask ${first} something…`}
-          className={`${inputClass} resize-none`}
+          className="block w-full resize-none bg-transparent px-4 pt-3 text-[0.95rem] outline-none placeholder:text-muted/70"
           aria-label={`Message ${first}`}
         />
-        <button className={`${buttonClass} self-end`} disabled={streaming || !draft.trim()}>
-          {streaming ? "…" : "Send"}
-        </button>
+        <div className="flex items-center justify-between gap-3 px-3 pb-2.5">
+          <span className="text-xs text-muted">Enter to send, Shift+Enter for a new line</span>
+          <button className={buttonClass} disabled={streaming || !draft.trim()}>
+            {streaming ? "Replying…" : "Send"}
+          </button>
+        </div>
+        </div>
       </form>
     </div>
   );

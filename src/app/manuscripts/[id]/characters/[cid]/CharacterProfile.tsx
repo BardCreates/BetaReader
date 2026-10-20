@@ -42,10 +42,10 @@ export function CharacterProfile(props: { characterId: string; name: string; rol
         <input value={fields.aliases} onChange={set("aliases")} placeholder="Comma-separated" className={inputClass} />
       </Field>
       <Field label="From the manuscript">
-        <textarea value={fields.summary} onChange={set("summary")} className={`${inputClass} grow-field min-h-24 max-h-80`} />
+        <textarea value={fields.summary} onChange={set("summary")} className={`${inputClass} grow-field min-h-24 max-h-80 resize-y`} />
       </Field>
       <Field label="Your notes" hint="Treated as true in every conversation. Save useful chat replies here.">
-        <textarea value={fields.notes} onChange={set("notes")} placeholder="Backstory, voice, secrets…" className={`${inputClass} grow-field min-h-32 max-h-[28rem]`} />
+        <textarea value={fields.notes} onChange={set("notes")} placeholder="Backstory, voice, secrets…" className={`${inputClass} grow-field min-h-32 max-h-[28rem] resize-y`} />
       </Field>
       <div className="flex items-center gap-3">
         <button className={ghostButtonClass} onClick={save} disabled={!dirty || pending}>

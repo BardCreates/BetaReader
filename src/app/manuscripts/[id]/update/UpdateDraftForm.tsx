@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useRef, useState } from "react";
 import { reimportDraft, type ReimportState } from "@/app/reimportActions";
+import { FileDrop } from "@/components/FileDrop";
 import { buttonClass, Card, ghostButtonClass, inputClass } from "@/components/ui";
 import type { ChapterChange } from "@/lib/manuscript/match";
 
@@ -46,17 +47,7 @@ export function UpdateDraftForm({ manuscriptId }: { manuscriptId: string }) {
           ))}
         </div>
         {mode === "file" ? (
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Revised manuscript</span>
-            <input
-              name="file"
-              type="file"
-              accept=".docx,.txt,.md,.markdown"
-              required
-              className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-line file:px-3 file:py-2 file:text-ink"
-            />
-            <span className="block text-xs text-muted">.docx, .txt or .md, up to 10 MB. Keep your chapter headings so chapters match up.</span>
-          </label>
+          <FileDrop accept=".docx,.txt,.md,.markdown" hint=".docx, .txt or .md, up to 10 MB. Keep your chapter headings so chapters match up." />
         ) : (
           <label className="block space-y-1.5">
             <span className="text-sm font-medium">Revised manuscript text</span>

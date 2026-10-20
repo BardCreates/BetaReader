@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 import { createManuscript, type FormState } from "@/app/actions";
+import { FileDrop } from "@/components/FileDrop";
 import { buttonClass, Card, inputClass } from "@/components/ui";
 
 export function NewManuscriptForm({ personas }: { personas: { id: string; label: string; short: string }[] }) {
@@ -73,9 +74,7 @@ export function NewManuscriptForm({ personas }: { personas: { id: string; label:
           ))}
         </div>
         {mode === "file" ? (
-          <Field label="Manuscript file" hint=".docx, .txt or .md, up to 10 MB. From Google Docs or Scrivener, export to .docx.">
-            <input name="file" type="file" accept=".docx,.txt,.md,.markdown" required className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-line file:px-3 file:py-2 file:text-ink" />
-          </Field>
+          <FileDrop accept=".docx,.txt,.md,.markdown" hint=".docx, .txt or .md, up to 10 MB. From Dabble, Scrivener or Google Docs, export a .docx." />
         ) : (
           <Field label="Manuscript text" hint="Start each chapter with a heading line like “Chapter 1” so we can split it.">
             <textarea name="text" rows={14} required className={`${inputClass} font-serif`} />

@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 // Fonts are bundled with the app (no download at build/dev time — next/font/google
 // fails in some Windows/offline/proxied environments).
-import "@fontsource-variable/inter";
+import "@fontsource-variable/source-sans-3";
 import "@fontsource-variable/literata";
 import "./globals.css";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: { default: "Beta Reader", template: "%s · Beta Reader" },
-  description: "An honest first reader for your manuscript: what's working, what isn't, and how to fix it.",
+  title: { default: `${BRAND.name}: ${BRAND.tagline.replace(/\.$/, "")}`, template: `%s · ${BRAND.name}` },
+  description: BRAND.description,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

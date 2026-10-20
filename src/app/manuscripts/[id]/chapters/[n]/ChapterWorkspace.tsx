@@ -221,7 +221,7 @@ export function ChapterWorkspace(p: Props) {
   return (
     <main className="mx-auto max-w-[96rem] px-4 py-6 sm:px-8 lg:px-12">
       {/* Header */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-4 flex flex-col-reverse items-stretch justify-between gap-3 sm:flex-row sm:items-start">
         <div className="min-w-0 flex-1">
           <p className="text-sm text-muted">
             Chapter {p.index + 1} of {p.total} · {words.toLocaleString()} words · <SaveStatus state={save} />
@@ -229,7 +229,7 @@ export function ChapterWorkspace(p: Props) {
           <TitleInput chapterId={p.chapterId} initial={p.title} />
           <IntentInput chapterId={p.chapterId} initial={p.intent} />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           <button className={buttonClass} onClick={reread} disabled={!canRead} title={words < p.minWords ? `Write at least ${p.minWords} words first` : undefined}>
             {busy ? "Reading…" : readLabel}
           </button>
@@ -476,19 +476,24 @@ function TitleInput({ chapterId, initial }: { chapterId: string; initial: string
   };
   return (
     <>
-      <input
+      {/* A one-line textarea so long titles wrap on small screens instead of being cut off. */}
+      <textarea
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        rows={1}
+        onChange={(e) => setValue(e.target.value.replace(/\n/g, " "))}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (e.target as HTMLTextAreaElement).blur();
+          }
           if (e.key === "Escape") {
             setValue(saved.current);
-            (e.target as HTMLInputElement).blur();
+            (e.target as HTMLTextAreaElement).blur();
           }
         }}
         aria-label="Chapter title"
-        className="w-full rounded-md border border-transparent bg-transparent px-1 -mx-1 font-serif text-3xl font-semibold outline-none hover:border-line focus:border-accent"
+        className="grow-field -mx-1 block w-full resize-none overflow-hidden rounded-md border border-transparent bg-transparent px-1 font-serif text-[1.75rem] leading-tight font-semibold tracking-[-0.01em] outline-none hover:border-line focus:border-accent sm:text-3xl"
       />
       {error && <p className="text-sm text-danger">{error}</p>}
     </>

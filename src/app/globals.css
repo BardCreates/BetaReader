@@ -1,17 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Source Sans 3 Variable", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Literata Variable", ui-serif, Georgia, serif;
 
-  /* Ink on paper: cool page, ink-blue accent. */
-  --color-paper: #f4f5f8;
+  /* Source Sans runs small next to Literata: nudge the UI text sizes up. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.45;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.55;
+
+  /* Readthrough: ink on a cool page, with the editor's red pen used only to mark things. */
+  --color-paper: #f5f6f8;
   --color-card: #ffffff;
-  --color-ink: #1b2130;
-  --color-muted: #5f6879;
-  --color-line: #e0e3ea;
-  --color-accent: #2b4985;
-  --color-accent-soft: #e5ebf6;
+  --color-ink: #161d2e;
+  --color-muted: #5b6475;
+  --color-line: #dfe2e9;
+  --color-accent: #24407c;
+  --color-accent-soft: #e4eaf6;
+  --color-pen: #c0392f;
+  --color-pen-soft: #f9e5e3;
   --color-danger: #b03a2e;
   --color-danger-soft: #f8e3df;
   --color-praise: #2c7051;
@@ -25,13 +35,15 @@
 /* Night reading: deep slate, lamp-lit ink. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-paper: #11141a;
-    --color-card: #181c24;
-    --color-ink: #e6e8ee;
-    --color-muted: #959dab;
+    --color-paper: #10131a;
+    --color-card: #171b23;
+    --color-ink: #e7e9ef;
+    --color-muted: #979fad;
     --color-line: #272d38;
-    --color-accent: #93abe4;
-    --color-accent-soft: #1d2639;
+    --color-accent: #9bb2e8;
+    --color-accent-soft: #1c2539;
+    --color-pen: #f0857c;
+    --color-pen-soft: #35201f;
     --color-danger: #ef8a7d;
     --color-danger-soft: #361e1c;
     --color-praise: #7cc5a0;
@@ -154,7 +166,7 @@ mark.invented {
 }
 
 /* Text areas that grow with their content (falls back to a normal resizable box). */
+/* Unlayered CSS beats Tailwind utilities, so resize is set per element (resize-y / resize-none). */
 .grow-field {
   field-sizing: content;
-  resize: vertical;
 }
