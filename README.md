@@ -107,7 +107,7 @@ Three layers keep costs bounded (`src/lib/billing`):
 
 ### Setting up Stripe
 
-1. In the Stripe dashboard (start in **test mode**), create products and prices:
+1. Quickest: `STRIPE_SECRET_KEY=sk_test_... npm run stripe:setup` creates the products, prices and customer portal below and prints the price-id lines for `.env` (safe to re-run; use the live key at launch). Or, in the Stripe dashboard (start in **test mode**), create products and prices:
    - Author: recurring $19/month and $149/year
    - Pro: recurring $39/month and $299/year
    - Book pass: one-time $29

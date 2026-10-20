@@ -16,7 +16,8 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "update": "npm install && prisma migrate deploy && prisma generate",
-    "worker": "tsx --conditions=react-server src/worker.ts"
+    "worker": "tsx --conditions=react-server src/worker.ts",
+    "stripe:setup": "tsx scripts/stripe-setup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
