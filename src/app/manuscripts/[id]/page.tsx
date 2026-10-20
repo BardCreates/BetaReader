@@ -191,29 +191,47 @@ export default async function ManuscriptPage({
             <Card className="p-2">
               <p className="px-3 pt-2 pb-1 text-sm font-medium">Your book</p>
               <ul>
+                <Tool href={`${base}/map`} title="Reader map" detail={doneCount ? "Where attention dipped, chapter by chapter" : "Built during a read"} />
                 <Tool href={`${base}/journey`} title="Reader journey" detail={ms._count.threads ? `${ms._count.threads} questions and predictions` : "Built during a read"} />
                 <Tool
                   href={`${base}/bible`}
-                  title="Story bible"
+                  title="Continuity ledger"
                   detail={openContinuity ? `${openContinuity} continuity problem${openContinuity === 1 ? "" : "s"}` : ms._count.facts ? `${ms._count.facts} facts, no contradictions` : "Built during a read"}
                   alert={openContinuity > 0}
                 />
-                {FEATURES.characterChat && (
-                  <Tool href={`${base}/characters`} title="Characters" detail={ms._count.characters ? `${ms._count.characters} to talk to` : "Find them in your manuscript"} />
-                )}
                 <Tool
-                  href={`${base}/pitch`}
-                  title="Pitch kit"
-                  detail={ms.pitchKit?.status === "DONE" ? "Logline, blurb, synopsis, query" : report ? "Ready to write" : "After a full read"}
+                  href={`${base}/drafts`}
+                  title="Draft changes"
+                  detail={ms.draft > 1 ? `Draft ${ms.draft} vs draft ${ms.draft - 1}` : "Compare drafts after you revise"}
                 />
+                {FEATURES.characterChat && (
+                  <Tool
+                    href={`${base}/characters`}
+                    title="Your cast"
+                    detail={ms._count.characters ? `Interview ${ms._count.characters} character${ms._count.characters === 1 ? "" : "s"}` : "Find them in your manuscript"}
+                  />
+                )}
+                {FEATURES.pitchKit && (
+                  <Tool
+                    href={`${base}/pitch`}
+                    title="Pitch kit"
+                    detail={ms.pitchKit?.status === "DONE" ? "Logline, blurb, synopsis, query" : report ? "Ready to write" : "After a full read"}
+                  />
+                )}
                 <Tool href={`${base}/update`} title="Update from new draft" detail="Upload a fresh export from Dabble or Word" />
               </ul>
             </Card>
-            <form action={deleteManuscript.bind(null, ms.id)} className="px-1">
-              <SubmitButton className="text-xs text-muted hover:text-danger" confirm="Delete this manuscript and all its feedback?">
-                Delete manuscript
-              </SubmitButton>
-            </form>
+            <Card className="p-4 text-xs text-muted" data-testid="manuscript-privacy">
+              <p className="font-medium text-ink">Your manuscript is yours</p>
+              <p className="mt-1">
+                Private to your account and never used to train AI. Deleting it removes its text, notes and reports from your account straight away.
+              </p>
+              <form action={deleteManuscript.bind(null, ms.id)} className="mt-2">
+                <SubmitButton className="text-xs text-muted underline hover:text-danger" confirm="Delete this manuscript and all its feedback? This can’t be undone.">
+                  Delete manuscript
+                </SubmitButton>
+              </form>
+            </Card>
           </aside>
         </div>
       </main>

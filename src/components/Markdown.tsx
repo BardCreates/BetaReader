@@ -65,7 +65,7 @@ function inline(s: string): React.ReactNode[] {
     const t = m[0];
     if (t.startsWith("⟦"))
       out.push(
-        <mark key={k++} className="invented" title="Invented in this chat, not in your manuscript">
+        <mark key={k++} className="invented" title="Not on the page: your manuscript doesn’t establish this">
           {t.slice(1, -1)}
         </mark>,
       );

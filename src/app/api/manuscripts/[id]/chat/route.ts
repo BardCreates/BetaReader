@@ -44,7 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     prepared = await (async () => {
       let conversation = parsed.data.conversationId
-        ? await db.conversation.findFirst({ where: { id: parsed.data.conversationId, manuscriptId } })
+        ? await db.conversation.findFirst({ where: { id: parsed.data.conversationId, manuscriptId, characterId: null, noteId: null } })
         : null;
       if (!conversation) {
         const chapterId = parsed.data.chapterId

@@ -49,7 +49,7 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Author",
     monthlyPrice: 19,
     yearlyPrice: 149,
-    tagline: "A full read every month, plus revisions.",
+    tagline: "One book at a time, every draft.",
     maxManuscripts: 10,
     maxWordsPerManuscript: 250_000,
     allowance: { words: 150_000, grammarWords: 300_000, chat: 200, pitchKits: 5, costCapUsd: 8 },
@@ -59,14 +59,14 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Pro",
     monthlyPrice: 39,
     yearlyPrice: 299,
-    tagline: "For series, several books, and heavy revision.",
+    tagline: "For series authors and several books at once.",
     maxManuscripts: 50,
     maxWordsPerManuscript: 400_000,
     allowance: { words: 500_000, grammarWords: 1_000_000, chat: 1_000, pitchKits: 20, costCapUsd: 25 },
   },
 };
 
-/** One-off purchase: enough for a full read of a novel, its pitch kit, and some revision. */
+/** One-off purchase: one full read of a novel up to `credit.words`, with questions about its notes. */
 export const BOOK_PASS = {
   name: "Book pass",
   price: 29,

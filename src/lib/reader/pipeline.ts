@@ -262,7 +262,7 @@ async function readChapter(args: {
       })
     )
       .slice(-MAX_BIBLE_FACTS)
-      .map((f, i) => ({ id: `F${i + 1}`, subject: f.subject, fact: f.fact, chapter: f.chapter.index + 1 }));
+      .map((f, i) => ({ id: `F${i + 1}`, subject: f.subject, fact: f.fact, chapter: f.chapter.index + 1, chapterId: f.chapterId }));
 
     const { data, usage } = await callStructured({
       system: args.system,
@@ -318,8 +318,11 @@ async function readChapter(args: {
         quote: c.quote,
         startOffset: anchor?.start ?? null,
         endOffset: anchor?.end ?? null,
-        comment: earlier ? `${c.explanation} (Earlier, in chapter ${earlier.chapter}: ${earlier.fact})` : c.explanation,
+        comment: c.explanation,
         suggestion: c.suggestion ?? null,
+        // Kept apart from the comment so the continuity ledger can show "established → contradicted".
+        conflictFact: earlier?.fact ?? null,
+        conflictChapterId: earlier?.chapterId ?? null,
       });
     }
     const facts: Prisma.StoryFactCreateManyInput[] = data.facts.map((f) => ({
@@ -353,9 +356,17 @@ async function readChapter(args: {
             }),
           }
         : previousIssues.length
-          ? { previousEngagement, notes: [] }
-          : null;
+          ? // The model didn't report on the earlier issues: say so rather than "nothing to check".
+            { previousEngagement, notes: [], unchecked: true }
+          : // A re-read always gets a revision check, even with no earlier issues, so the engagement
+            // change and "revised, not new" show up on the drafts page.
+            before?.status === "DONE"
+            ? { previousEngagement, notes: [] }
+            : null;
     const intentCheck = chapter.intent?.trim() && data.intentCheck ? { intent: chapter.intent.trim(), ...data.intentCheck } : null;
+    // Keep the quote only if it's on the page (a paraphrase can't be shown as the author's words); keep the dip either way.
+    const dropOff = data.dropOff ? { quote: findQuote(text, data.dropOff.quote, 0) ? data.dropOff.quote : null, why: data.dropOff.why } : null;
+    const draft = (await db.manuscript.findUnique({ where: { id: chapter.manuscriptId }, select: { draft: true } }))?.draft ?? null;
 
     await db.$transaction([
       db.note.deleteMany({ where: { reviewId: review.id } }),
@@ -382,6 +393,8 @@ async function readChapter(args: {
           memory: data.memory,
           intentCheck: intentCheck ?? Prisma.DbNull,
           revisionCheck: revisionCheck ?? Prisma.DbNull,
+          dropOff: dropOff ?? Prisma.DbNull,
+          draft,
           model: MODEL,
           inputTokens: usage.input,
           outputTokens: usage.output,

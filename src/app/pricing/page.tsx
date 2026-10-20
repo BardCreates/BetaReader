@@ -1,3 +1,4 @@
+import { ManuscriptPromise } from "@/components/ManuscriptPromise";
 import { PublicFooter, PublicHeader } from "@/components/PublicChrome";
 import { auth } from "@/auth";
 import { billingEnabled } from "@/lib/billing/stripe";
@@ -20,8 +21,8 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
       <header className="max-w-2xl pt-8">
         <h1 className="font-serif text-4xl font-semibold leading-tight">Pricing</h1>
         <p className="mt-3 text-lg text-muted">
-          Pay for the reading you need. Every plan includes the full reader: chapter notes, the editorial report, reader journey,
-          continuity checks and the story bible.
+          Pay for the reading you need, counted in words, not credits. Every plan includes the full reader: chapter notes, the editorial
+          report, the reader map and journey, and the continuity ledger.
         </p>
       </header>
 
@@ -31,7 +32,9 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
 
       <PricingPlans loggedIn={!!account} currentPlan={account?.plan ?? null} currentInterval={account?.billingInterval ?? null} billingOn={billingEnabled()} />
 
-      <section className="grid gap-8 border-t border-line py-12 text-sm md:grid-cols-3">
+      <ManuscriptPromise className="mt-12 border-t border-line pt-12" />
+
+      <section className="mt-12 grid gap-8 border-t border-line py-12 text-sm md:grid-cols-3">
         <div>
           <h2 className="font-serif text-lg font-semibold">No surprise charges</h2>
           <p className="mt-2 text-muted">

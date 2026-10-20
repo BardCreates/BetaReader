@@ -109,6 +109,7 @@ model Manuscript {
   status      ReadingStatus @default(DRAFT)
   error       String?       @db.Text
   errorCode   String?       // "LIMIT" when a read paused because the plan's allowance ran out
+  draft       Int           @default(1) // which draft this is; goes up each time a revised draft is imported
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -120,8 +121,22 @@ model Manuscript {
   characters    Character[]
   facts         StoryFact[]
   pitchKit      PitchKit?
+  drafts        Draft[]
 
   @@index([userId])
+}
+
+// A revised draft brought in from Dabble, Word etc. (draft 1, the first upload, has no row).
+model Draft {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  number       Int      // 2, 3, …
+  summary      Json     // { changed: string[], added: string[], removed: string[], unchanged: number } — chapter titles
+  createdAt    DateTime @default(now())
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+
+  @@unique([manuscriptId, number])
 }
 
 model Chapter {
@@ -142,6 +157,7 @@ model Chapter {
   threadsRaised   ReaderThread[] @relation("raisedIn")
   threadsResolved ReaderThread[] @relation("resolvedIn")
   facts           StoryFact[]
+  conflictNotes   Note[]         @relation("conflictOf")
 
   @@unique([manuscriptId, index])
 }
@@ -163,6 +179,8 @@ model ChapterReview {
   readAt     DateTime?     // when the read started; content edited after this means the notes are out of date
   intentCheck   Json?      // { landed: "yes"|"partly"|"no", explanation } when the chapter had an intent
   revisionCheck Json?      // { previousEngagement, notes: [{quote, comment, authorStatus, verdict, explanation}] } on a re-read
+  dropOff       Json?      // { quote, why }: where the reader's attention dipped most, for the reader map; null if it never did
+  draft         Int?       // Manuscript.draft when this read happened
 
   model        String?
   inputTokens  Int @default(0)
@@ -197,11 +215,18 @@ model Note {
   startOffset Int?       // character offsets into Chapter.content (null if the quote couldn't be located)
   endOffset   Int?
   comment     String     @db.Text   // what the reader felt / why it isn't working
-  suggestion  String?    @db.Text   // how to fix it
+  suggestion  String?    @db.Text   // how to approach a fix (never replacement prose: the author writes the fix)
   status      NoteStatus @default(OPEN)
   createdAt   DateTime   @default(now())
 
-  review ChapterReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  // Continuity notes: the earlier fact this passage contradicts, for the continuity ledger.
+  // Linked by id, so the chapter number stays right when a re-import inserts or removes chapters.
+  conflictFact      String?  @db.Text
+  conflictChapterId String?
+
+  review          ChapterReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  conflictChapter Chapter?      @relation("conflictOf", fields: [conflictChapterId], references: [id], onDelete: SetNull)
+  conversation    Conversation?
 
   @@index([reviewId])
 }
@@ -297,7 +322,7 @@ model CharacterImage {
   character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 }
 
-// ─── Conversations (editor chat — off in v1 — and character chat) ─
+// ─── Conversations (questions about a note, character interviews, and editor chat — off in v1) ─
 
 model Conversation {
   id           String   @id @default(cuid())
@@ -305,6 +330,8 @@ model Conversation {
   chapterId    String?
   characterId  String?
   asOfChapter  Int?     // character chat: what the character knows, up to this chapter (1-based); null = whole book
+  mode         String?  // character interview mode, see INTERVIEW_MODES in src/lib/reader/characters.ts
+  noteId       String?  @unique // a conversation about one reader note (one per note)
   title        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -312,6 +339,7 @@ model Conversation {
   manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
   chapter    Chapter?   @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   character  Character? @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  note       Note?      @relation(fields: [noteId], references: [id], onDelete: Cascade)
   messages   Message[]
 
   @@index([manuscriptId])
@@ -375,7 +403,7 @@ model AiUsage {
   id               String   @id @default(cuid())
   userId           String
   manuscriptId     String?
-  kind             String   // read | report | grammar | chat | characters | pitch | editor
+  kind             String   // read | report | grammar | chat | discuss | characters | pitch | editor
   model            String
   inputTokens      Int      @default(0)
   outputTokens     Int      @default(0)

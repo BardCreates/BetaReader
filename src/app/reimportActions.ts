@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { findQuote } from "@/lib/manuscript/anchor";
 import { plainToDoc } from "@/lib/manuscript/doc";
 import { extractText } from "@/lib/manuscript/import";
+import { draftSummary } from "@/lib/manuscript/drafts";
 import { canonicalText, matchChapters, summarizeChanges, type ChapterChange } from "@/lib/manuscript/match";
 import { countWords, splitIntoChapters } from "@/lib/manuscript/split";
 import { planFor } from "@/lib/plans";
@@ -46,6 +47,7 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
       id: true,
       status: true,
       wordCount: true,
+      draft: true,
       user: { select: { plan: true } },
       chapters: { orderBy: { index: "asc" }, select: { id: true, index: true, title: true, content: true, review: { select: { id: true } } } },
     },
@@ -147,7 +149,12 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
     );
   }
 
-  ops.push(db.manuscript.update({ where: { id: ms.id }, data: { wordCount: words } }));
+  // A new draft number, so the changes page can compare this draft's reads with the last one's.
+  // An identical upload isn't a new draft.
+  const isNewDraft = summary.changed + summary.added + summary.removed > 0;
+  const draft = isNewDraft ? ms.draft + 1 : ms.draft;
+  ops.push(db.manuscript.update({ where: { id: ms.id }, data: { wordCount: words, draft } }));
+  if (isNewDraft) ops.push(db.draft.create({ data: { manuscriptId: ms.id, number: draft, summary: draftSummary(changes) } }));
   await db.$transaction(ops);
 
   revalidatePath(`/manuscripts/${ms.id}`, "layout");

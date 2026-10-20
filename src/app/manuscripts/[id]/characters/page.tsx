@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { FEATURES } from "@/lib/features";
 import { AddCharacterForm, FindCharactersButton } from "./CharacterForms";
 
-export const metadata = { title: "Characters" };
+export const metadata = { title: "Your cast" };
 
 export default async function CharactersPage({ params }: { params: Promise<{ id: string }> }) {
   if (!FEATURES.characterChat) notFound();
@@ -40,10 +40,10 @@ export default async function CharactersPage({ params }: { params: Promise<{ id:
     <main className="mx-auto max-w-5xl px-4 py-10 sm:px-8 lg:px-12">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl font-semibold">Characters</h1>
+          <h1 className="font-serif text-3xl font-semibold">Your cast</h1>
           <p className="mt-1 max-w-2xl text-muted">
-            Talk with your characters to fill gaps and brainstorm. They answer in their own voice, drawing on the scenes they appear in, and mark
-            anything they invent ⟦like this⟧ so you can tell it apart from what’s on the page.
+            Interview your characters to find the gaps in motivation and backstory. They answer in their own voice from the scenes they appear in
+            and what the reader’s ledger has on them, and highlight anything the page doesn’t establish, so you can see what’s still missing.
           </p>
         </div>
         <FindCharactersButton manuscriptId={ms.id} hasAny={ms.characters.length > 0} />
@@ -69,7 +69,7 @@ export default async function CharactersPage({ params }: { params: Promise<{ id:
                   </div>
                   <p className="mt-2 line-clamp-3 text-sm text-muted">{c.summary || c.notes || "No description yet."}</p>
                   <p className="mt-3 text-xs text-accent">
-                    {c._count.conversations ? `${c._count.conversations} conversation${c._count.conversations === 1 ? "" : "s"} · ` : ""}Talk to {c.name.split(" ")[0]}
+                    {c._count.conversations ? `${c._count.conversations} conversation${c._count.conversations === 1 ? "" : "s"} · ` : ""}Interview {c.name.split(" ")[0]}
                   </p>
                 </Card>
               </Link>

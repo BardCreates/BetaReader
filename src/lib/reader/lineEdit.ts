@@ -2,14 +2,12 @@ import "server-only";
 import { z } from "zod";
 import type { Meter } from "@/lib/billing/usage";
 import { callStructured } from "./anthropic";
+import { SUGGESTION_TYPES, toSuggestions, type LineSuggestion } from "./lineSuggestions";
 
-/** Grammar & style uses a smaller, cheaper model than the reader. */
+/** Proofreading uses a smaller, cheaper model than the reader. */
 export const LINE_EDIT_MODEL = process.env.ANTHROPIC_LINE_MODEL || "claude-haiku-5-5";
 
-export const SUGGESTION_TYPES = ["spelling", "grammar", "punctuation", "word_choice", "repetition", "clarity", "style"] as const;
-export type SuggestionType = (typeof SUGGESTION_TYPES)[number];
-
-export type LineSuggestion = { id: string; quote: string; replacement: string; type: SuggestionType; explanation: string };
+export { SUGGESTION_TYPES, isMechanical, type LineSuggestion, type SuggestionType } from "./lineSuggestions";
 
 const SuggestionSchema = z.object({
   suggestions: z
@@ -39,18 +37,25 @@ const schema = {
             description:
               "The exact text to change, copied character for character from the passage. Keep it short: the error plus just enough words to be unique (max ~12 words).",
           },
-          replacement: { type: "string", description: "What should replace `quote`, exactly. Same span, corrected." },
+          replacement: {
+            type: "string",
+            description:
+              'For spelling, grammar and punctuation only: what should replace `quote`, exactly (same span, corrected). For every other type, "": the author rewrites it themselves.',
+          },
           type: { type: "string", enum: [...SUGGESTION_TYPES] },
-          explanation: { type: "string", description: "One short sentence the author will see." },
+          explanation: {
+            type: "string",
+            description: "One short sentence the author will see. For flags, say what the problem is (\"'quietly' twice in two lines\"), not how to reword it.",
+          },
         },
       },
     },
   },
 };
 
-const SYSTEM = `You are a careful copy editor and line editor for fiction. Find:
-- clear errors: spelling, grammar, punctuation, wrong words (their/there, affect/effect), typos, missing or doubled words
-- a few high-value line edits: awkward or unclear sentences, accidental word repetition close together, weak word choice
+const SYSTEM = `You are a careful proofreader for fiction. Find:
+- clear errors: spelling, grammar, punctuation, wrong words (their/there, affect/effect), typos, missing or doubled words. Give the corrected text as the replacement.
+- a few high-value flags: awkward or unclear sentences, accidental word repetition close together, weak word choice. For these, leave replacement empty and explain the problem in a few words. Never reword the author's sentence for them; they will rewrite it themselves.
 
 Respect the author's voice. Do NOT "correct":
 - dialect, slang, or deliberate grammar in dialogue and close point of view
@@ -113,10 +118,5 @@ export async function lineEditText(text: string, meter: Meter): Promise<{ sugges
     usage.output += u.output;
     return data.suggestions;
   });
-  let n = 0;
-  const suggestions = results
-    .flat()
-    .filter((s) => s.quote !== s.replacement)
-    .map((s) => ({ id: `s${++n}`, ...s }));
-  return { suggestions, usage };
+  return { suggestions: toSuggestions(results.flat()), usage };
 }

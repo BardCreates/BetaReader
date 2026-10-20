@@ -5,21 +5,29 @@ import { useState } from "react";
 import { startCheckout } from "@/app/billingActions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { buttonClass, ghostButtonClass } from "@/components/ui";
+import { FEATURES } from "@/lib/features";
 import { BOOK_PASS, PLANS, yearlySavingPct, type Plan } from "@/lib/plans";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
+/** What each plan is for, in plain units: words read, messages, manuscripts. No credits. */
 function features(plan: Plan): string[] {
   const a = plan.allowance;
   const per = plan.id === "free" ? "" : " a month";
+  const read = {
+    free: `${fmt(a.words)} words read, once: about your opening chapters`,
+    author: `${fmt(a.words)} words read a month: a full novel, or many rounds of revision`,
+    pro: `${fmt(a.words)} words read a month: several books, or a series`,
+  }[plan.id];
   return [
-    plan.id === "free"
-      ? `${fmt(a.words)} words read, about your first three chapters`
-      : `${fmt(a.words)} words read${per}${plan.id === "author" ? ": a full novel, or many rounds of revision" : ""}`,
-    `Grammar & style on ${fmt(a.grammarWords)} words${per}`,
-    `${fmt(a.chat)} character chat messages${per}`,
-    `${a.pitchKits} pitch kit${a.pitchKits === 1 ? "" : "s"}${per}`,
-    `${plan.maxManuscripts} manuscript${plan.maxManuscripts === 1 ? "" : "s"}, up to ${fmt(plan.maxWordsPerManuscript)} words each`,
+    read,
+    ...(plan.id === "free" ? [] : ["Every draft: re-import, see what each revision fixed, keep the continuity ledger"]),
+    `${fmt(a.chat)} messages${per} to interview your cast or question a note`,
+    `Proofreading on ${fmt(a.grammarWords)} words${per}`,
+    ...(FEATURES.pitchKit ? [`${a.pitchKits} pitch kit${a.pitchKits === 1 ? "" : "s"}${per}`] : []),
+    plan.maxManuscripts === 1
+      ? `1 manuscript, up to ${fmt(plan.maxWordsPerManuscript)} words`
+      : `Up to ${plan.maxManuscripts} manuscripts, ${fmt(plan.maxWordsPerManuscript)} words each`,
   ];
 }
 
@@ -104,8 +112,9 @@ export function PricingPlans(props: { loggedIn: boolean; currentPlan: string | n
             {BOOK_PASS.name} <span className="ml-1 font-sans text-base font-normal text-muted">${BOOK_PASS.price} once</span>
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Just finished a draft and don’t want a subscription? A pass adds {fmt(BOOK_PASS.credit.words)} words of reading (a full novel), a pitch
-            kit, and some grammar checks and character chat. It never expires and works on any plan, including Free.
+            Just finished a draft and don’t want a subscription? One full read of a novel up to {fmt(BOOK_PASS.credit.words)} words, with{" "}
+            {fmt(BOOK_PASS.credit.chat)} messages to question its notes or interview your cast, and proofreading on {fmt(BOOK_PASS.credit.grammarWords)}{" "}
+            words. It never expires and works on any plan, including Free.
           </p>
         </div>
         {props.loggedIn ? (

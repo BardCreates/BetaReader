@@ -7,12 +7,14 @@ import { db } from "@/lib/db";
 import { FEATURES } from "@/lib/features";
 import { MODEL, anthropic } from "@/lib/reader/anthropic";
 import { characterSystemPrompt } from "@/lib/reader/characters";
+import { isInterviewMode } from "@/lib/reader/interview";
 
 export const maxDuration = 120;
 
 const Body = z.object({
   conversationId: z.string().nullish(),
   asOfChapter: z.number().int().positive().nullish(),
+  mode: z.string().nullish(),
   message: z.string().trim().min(1).max(20_000),
 });
 
@@ -53,7 +55,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const total = character.manuscript._count.chapters;
         const asOf = parsed.data.asOfChapter && parsed.data.asOfChapter < total ? parsed.data.asOfChapter : null;
         conversation = await db.conversation.create({
-          data: { manuscriptId, characterId: character.id, asOfChapter: asOf, title: message.slice(0, 80) },
+          data: {
+            manuscriptId,
+            characterId: character.id,
+            asOfChapter: asOf,
+            mode: isInterviewMode(parsed.data.mode) && parsed.data.mode !== "open" ? parsed.data.mode : null,
+            title: message.slice(0, 80),
+          },
         });
       }
 
@@ -64,7 +72,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       while (history[0]?.role === "assistant") history.shift();
       await db.message.create({ data: { conversationId: conversation.id, role: "user", content: message } });
 
-      const system = await characterSystemPrompt(character.id, conversation.asOfChapter);
+      const system = await characterSystemPrompt(character.id, conversation.asOfChapter, conversation.mode);
       const conversationId = conversation.id;
 
       // Hold the reply's worst-case cost against the spend ceiling before calling.

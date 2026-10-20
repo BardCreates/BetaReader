@@ -3,6 +3,7 @@ import { requireUser } from "@/auth";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { db } from "@/lib/db";
 import { plainToDoc, type DocNode } from "@/lib/manuscript/doc";
+import { parseDropOff } from "@/lib/reader/dropOff";
 import { MIN_WORDS_TO_READ, isReviewStale, isStale } from "@/lib/reader/pipeline";
 import { ChapterWorkspace, type IntentCheck, type RevisionCheck } from "./ChapterWorkspace";
 
@@ -19,7 +20,16 @@ export default async function ChapterPage({ params }: { params: Promise<{ id: st
   if (!ms) notFound();
   const chapter = await db.chapter.findUnique({
     where: { manuscriptId_index: { manuscriptId: ms.id, index } },
-    include: { review: { include: { notes: { orderBy: [{ startOffset: "asc" }, { createdAt: "asc" }] } } } },
+    include: {
+      review: {
+        include: {
+          notes: {
+            orderBy: [{ startOffset: "asc" }, { createdAt: "asc" }],
+            include: { conversation: { select: { id: true } }, conflictChapter: { select: { index: true } } },
+          },
+        },
+      },
+    },
   });
   if (!chapter) notFound();
 
@@ -58,6 +68,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ id: st
                 predictions: (r.predictions as string[] | null) ?? [],
                 intentCheck: (r.intentCheck as IntentCheck | null) ?? null,
                 revisionCheck: (r.revisionCheck as RevisionCheck | null) ?? null,
+                dropOff: parseDropOff(r.dropOff),
                 notes: r.notes.map((note) => ({
                   id: note.id,
                   kind: note.kind,
@@ -68,6 +79,8 @@ export default async function ChapterPage({ params }: { params: Promise<{ id: st
                   comment: note.comment,
                   suggestion: note.suggestion,
                   status: note.status,
+                  conflict: note.conflictFact && note.conflictChapter ? { fact: note.conflictFact, chapter: note.conflictChapter.index + 1 } : null,
+                  discussed: note.conversation != null,
                 })),
               }
             : null

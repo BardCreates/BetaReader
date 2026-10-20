@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { callStructured } from "./anthropic";
 import { castBlock, castWithPronouns } from "./cast";
 import { characterExcerpts } from "./characterContext";
+import { factsAbout, interviewMode } from "./interview";
 import { LINE_EDIT_MODEL } from "./lineEdit";
 
 /** Character discovery reads the whole book, so it uses the smaller, cheaper model. */
@@ -159,8 +160,11 @@ function profileLines(
     .join("");
 }
 
-/** The in-character system prompt: who they are, and the passages they appear in. */
-export async function characterSystemPrompt(characterId: string, asOfChapter: number | null) {
+/** Cap on story-bible facts given to a character (newest kept). */
+const MAX_CHARACTER_FACTS = 80;
+
+/** The in-character system prompt: who they are, what the page establishes, and the passages they appear in. */
+export async function characterSystemPrompt(characterId: string, asOfChapter: number | null, mode: string | null = null) {
   const c = await db.character.findUniqueOrThrow({
     where: { id: characterId },
     include: {
@@ -177,8 +181,19 @@ export async function characterSystemPrompt(characterId: string, asOfChapter: nu
   const others = castBlock((await castWithPronouns(c.manuscriptId)).filter((m) => m.name !== c.name));
   const { text, mentions } = characterExcerpts(c.manuscript.chapters, c.name, aliases, { asOfChapter, maxWords: 20_000 });
   const total = c.manuscript.chapters.length;
+  // What the reader's story bible established about them, up to the point they know.
+  const facts = factsAbout(
+    await db.storyFact.findMany({
+      where: { manuscriptId: c.manuscriptId, ...(asOfChapter ? { chapter: { index: { lt: asOfChapter } } } : {}) },
+      select: { subject: true, fact: true, chapter: { select: { index: true } } },
+      orderBy: [{ chapter: { index: "asc" } }, { createdAt: "asc" }],
+    }),
+    c.name,
+    aliases,
+  ).slice(-MAX_CHARACTER_FACTS);
+  const interview = interviewMode(mode).prompt;
 
-  return `You are ${c.name}, a character in "${c.manuscript.title}"${c.manuscript.genre ? `, a ${c.manuscript.genre}` : ""}. The author is talking with you to understand you better and brainstorm. Stay in character: speak as ${c.name} would, in their voice, with their knowledge, opinions, blind spots and secrets.
+  return `You are ${c.name}, a character in "${c.manuscript.title}"${c.manuscript.genre ? `, a ${c.manuscript.genre}` : ""}. The author is interviewing you to understand you better and find the gaps in what they know about you. Stay in character: speak as ${c.name} would, in their voice, with their knowledge, opinions, blind spots and secrets.
 
 What you know: ${
     asOfChapter
@@ -186,13 +201,19 @@ What you know: ${
       : `everything you lived through in the book (all ${total} chapters).`
   } You only know what ${c.name} would plausibly know, not other characters' private scenes.
 
-Inventing: the author will ask about things the manuscript doesn't cover: your past, your feelings, what you'd do in a new situation. Answer them; that's the point. But wrap every specific detail that is NOT established in the manuscript passages below in ⟦ and ⟧, e.g. "My father ⟦sold boats in Galway⟧." so the author can tell canon from invention. Never contradict what's on the page; if asked about something the text settles, stay true to it.
+What's canon: only what the manuscript passages, the established facts and the author's profile and notes below say. That is all you know for certain about yourself.
+
+When the page doesn't say: the author will ask about things the manuscript doesn't cover: your past, your feelings, what you'd do in a new situation. Finding those gaps is the point of the interview, so make them visible. Let it show briefly in your own voice that the question goes past anything you've said before (vary how; don't repeat a stock phrase), then answer, and wrap every specific detail that is NOT established on the page in ⟦ and ⟧, e.g. "Nobody's ever asked me that. My father ⟦sold boats in Galway⟧." so the author can tell canon from invention. Never present an invention as something the book established, and never contradict what's on the page; if the text settles it, stay true to it.
 
 Out of character: if the author's message starts with "OOC:", step out of character and answer as a thoughtful writing partner analysing ${c.name} (motivation, arc, consistency, what's missing), quoting the passages where useful. Otherwise never break character or mention being an AI.
 
 Keep replies conversational, usually a few short paragraphs. Ask the author a question back sometimes, the way ${c.name} would.
-
+${interview ? `\n${interview}\n` : ""}
 ${profileLines(c, aliases)}${
+    facts.length
+      ? `\nEstablished on the page about you (from the reader's story bible):\n${facts.map((f) => `- (ch. ${f.chapter.index + 1}) ${f.fact}`).join("\n")}\n`
+      : ""
+  }${
     others ? `\n${others}\n` : ""
   }${
     c.notes?.trim() ? `\nThe author's own notes about you (treat as true):\n<author_notes>\n${c.notes.trim()}\n</author_notes>\n` : ""
