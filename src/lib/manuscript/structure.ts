@@ -23,8 +23,8 @@ import { countWords, type SplitChapter } from "./split";
 export type Block = { type: "heading"; level: number; text: string } | { type: "para"; text: string } | { type: "break" };
 
 const PART = /^(part|book)\s+(\d+|[ivxlc]+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i;
-/** A paragraph with no letters or digits, short: a scene separator. */
-const SEPARATOR = /^[^\p{L}\p{N}]{1,9}$/u;
+/** A short paragraph made only of separator marks ("#", "* * *", "~~~", "◆"): a scene break. Quotes, dashes in dialogue and ellipses are not. */
+const SEPARATOR = /^(?=.*[^\s])[\s#*~_=+◆◇•·⁂§°❧※✦✧-]{1,15}$/u;
 
 // ─── Readers ────────────────────────────────────────────────────
 
@@ -125,7 +125,7 @@ export function looksLikeTitlePage(text: string) {
   return (
     /\b\d{1,3}(,\d{3})+\s+words\b|\b(approx(\.|imately)?|about)\s+[\d,]+\s+words\b/i.test(text) ||
     /\S+@\S+\.\S+/.test(text) ||
-    /^by\s+\S/im.test(text)
+    /^by\s+[^\n.!?]{1,60}$/im.test(text)
   );
 }
 
@@ -138,11 +138,29 @@ export function chaptersFromBlocks(blocks: Block[]): SplitChapter[] | null {
   const levels = [...new Set(headings.map((h) => h.level))].sort((a, b) => a - b);
   const count = (l: number) => headings.filter((h) => h.level === l).length;
 
+  // Words under each heading of a level, up to the next heading at that level or above.
+  const avgWords = (l: number) => {
+    let total = 0;
+    let open = false;
+    for (const b of blocks) {
+      if (b.type === "heading" && b.level <= l) open = b.level === l;
+      else if (open && b.type === "para") total += countWords(b.text);
+    }
+    return total / Math.max(1, count(l));
+  };
+
   let chapterLevel: number | undefined;
   for (const l of levels) {
     if (count(l) < 2) continue; // a book title
     const named = headings.filter((h) => h.level === l);
-    if (named.every((h) => PART.test(h.text)) && levels.some((d) => d > l && count(d) >= 2)) continue; // parts
+    const deeper = levels.find((d) => d > l && count(d) >= 2);
+    if (deeper !== undefined) {
+      // Parts, not chapters: named "Part …"/"Book …", or a few very long sections each holding
+      // several headings (no chapter runs 12,000 words; a part usually does).
+      const parts = named.filter((h) => PART.test(h.text)).length;
+      if (parts >= 2 && parts >= named.length / 2) continue; // "Part One"… with the odd interlude between
+      if (avgWords(l) > 12_000 && count(deeper) >= 2 * count(l)) continue;
+    }
     chapterLevel = l;
     break;
   }
@@ -159,16 +177,25 @@ export function chaptersFromBlocks(blocks: Block[]): SplitChapter[] | null {
     current = null;
   };
 
+  let seenHeading = false;
   for (const b of blocks) {
     if (b.type === "heading") {
-      if (b.level === chapterLevel && !PART.test(b.text)) {
-        close();
-        current = { title: b.text.slice(0, 200), parts: [] };
-      } else if (b.level > chapterLevel) {
+      const firstHeading = !seenHeading;
+      seenHeading = true;
+      if (b.level > chapterLevel) {
         push(SCENE_BREAK); // scene title
-      } else {
-        close(); // a part divider or the book title: the next chapter starts fresh
-        if (!chapters.length) preamble = [];
+        continue;
+      }
+      close();
+      if (b.level === chapterLevel && !PART.test(b.text)) {
+        current = { title: b.text.slice(0, 200), parts: [] };
+      } else if (firstHeading && !chapters.length) {
+        // The book title (or a first part divider) at the very top: what follows it until the
+        // first chapter is front matter, kept with anything before it.
+      } else if (chapters.length || !firstHeading) {
+        // A part divider, interlude or epilogue above chapter level: anything under it is part
+        // of the book, so keep it, in order, as its own section (empty dividers vanish).
+        current = { title: b.text.slice(0, 200), parts: [] };
       }
     } else if (b.type === "break") push(SCENE_BREAK);
     else push(b.text);
@@ -176,9 +203,10 @@ export function chaptersFromBlocks(blocks: Block[]): SplitChapter[] | null {
   close();
   if (chapters.length < 2) return null;
 
+  // Before the first chapter: a short title page is left out; anything substantial is kept.
   const opening = tidy(preamble);
-  if (countWords(opening) >= 150 && !looksLikeTitlePage(opening.slice(0, 1500))) {
-    chapters.unshift({ title: "Opening", content: opening, wordCount: countWords(opening) });
+  if (countWords(opening) >= 150) {
+    chapters.unshift({ title: looksLikeTitlePage(opening.slice(0, 1500)) ? "Front matter" : "Opening", content: opening, wordCount: countWords(opening) });
   }
   return chapters;
 }

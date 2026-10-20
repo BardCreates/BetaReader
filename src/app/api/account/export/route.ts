@@ -17,6 +17,10 @@ export async function GET() {
       createdAt: true,
       plan: true,
       billingInterval: true,
+      aiUsage: {
+        orderBy: { createdAt: "asc" },
+        select: { kind: true, model: true, inputTokens: true, outputTokens: true, costMicros: true, createdAt: true },
+      },
       manuscripts: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -62,6 +66,17 @@ export async function GET() {
           threads: { select: { kind: true, text: true, outcome: true, resolution: true, raisedChapter: { select: { index: true } }, resolvedChapter: { select: { index: true } } } },
           facts: { select: { subject: true, category: true, fact: true, chapter: { select: { index: true } } } },
           snapshots: { select: { draft: true, reason: true, data: true, createdAt: true } },
+          // Editor conversations (characters' conversations are listed under each character).
+          conversations: {
+            where: { characterId: null },
+            orderBy: { createdAt: "asc" },
+            select: {
+              title: true,
+              createdAt: true,
+              chapter: { select: { index: true } },
+              messages: { orderBy: { createdAt: "asc" }, select: { role: true, content: true, createdAt: true } },
+            },
+          },
           characters: {
             select: {
               name: true,

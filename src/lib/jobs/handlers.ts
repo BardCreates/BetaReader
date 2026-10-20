@@ -21,7 +21,7 @@ const ReservationJson = z
 export const toJsonReservation = (r: Reservation | null) => (r ? { ...r, periodStart: r.periodStart.toISOString() } : null);
 
 export const JOB_HANDLERS: Record<JobKind, Handler> = {
-  async read_manuscript(p, job) {
+  async read_manuscript(p, job, signal) {
     const { manuscriptId, rereadChanged } = z.object({ manuscriptId: z.string(), rereadChanged: z.boolean().optional() }).parse(p);
     // Never two readers on one book: if another job is already reading it, leave it to that one.
     const stale = new Date(Date.now() - JOB_STALE_MS);
@@ -29,7 +29,7 @@ export const JOB_HANDLERS: Record<JobKind, Handler> = {
       SELECT 1 FROM "Job" WHERE kind = 'read_manuscript' AND status = 'running' AND id <> ${job.id}
         AND payload->>'manuscriptId' = ${manuscriptId} AND "lockedAt" > ${stale} LIMIT 1`;
     if (busy.length) return;
-    await readManuscript(manuscriptId, { rereadChanged });
+    await readManuscript(manuscriptId, { rereadChanged, signal });
   },
   async reread_chapter(p) {
     const { chapterId, reservation } = z.object({ chapterId: z.string(), reservation: ReservationJson }).parse(p);

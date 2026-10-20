@@ -110,6 +110,7 @@ model Manuscript {
   draft       Int           @default(1) // which draft this is: goes up each time a revised draft is imported
   error       String?       @db.Text
   errorCode   String?       // "LIMIT" when a read paused because the plan's allowance ran out
+  openReservation Json?     // words reserved for the chapter being read; given back if the worker died mid-chapter
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -426,7 +427,7 @@ model StripeEvent {
 
 // One chapter read for someone without an account (/try). Deleted after TRIAL_RETENTION_DAYS.
 model TrialRead {
-  id        String        @id @default(cuid())
+  id        String        @id @default(cuid(2)) // in a public link, so not guessable
   ipHash    String        // salted hash of the visitor's address, for rate limits; never the address
   title     String?
   genre     String?

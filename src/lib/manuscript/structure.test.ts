@@ -74,3 +74,34 @@ test("title page detection and entity decoding", () => {
   assert.ok(!looksLikeTitlePage("The morning the river froze, nobody in the village went to work."));
   assert.equal(decodeEntities("&#8220;Hi&#x201D; &amp; bye&nbsp;"), "“Hi” & bye ");
 });
+
+test("an interlude or epilogue above chapter level stays in place as its own section", () => {
+  const html = `<h1>Part One</h1><h2>One</h2><p>A.</p><h2>Two</h2><p>B.</p><h1>Interlude</h1><p>${prose(500, "i")}</p><h1>Part Two</h1><h2>Three</h2><p>C.</p><h1>Epilogue</h1><p>The end.</p>`;
+  const ch = chaptersFromBlocks(blocksFromHtml(html))!;
+  assert.deepEqual(
+    ch.map((c) => c.title),
+    ["One", "Two", "Interlude", "Three", "Epilogue"],
+  );
+});
+
+test("a prologue starting 'By the time…' is kept, and a title page with prose after it is kept as front matter", () => {
+  const html = `<p>By the time the river froze, nobody went to work. ${prose(200)}</p><h1>One</h1><p>A.</p><h1>Two</h1><p>B.</p>`;
+  assert.equal(chaptersFromBlocks(blocksFromHtml(html))![0].title, "Opening");
+  const html2 = `<p>jane@example.com</p><p>${prose(200)}</p><h1>One</h1><p>A.</p><h1>Two</h1><p>B.</p>`;
+  assert.equal(chaptersFromBlocks(blocksFromHtml(html2))![0].title, "Front matter");
+});
+
+test("dialogue made of punctuation is not a scene break", () => {
+  const blocks = blocksFromHtml(`<p>“…”</p><p>—</p><p>?!</p><p>* * *</p><p>#</p><p>◆</p>`);
+  assert.deepEqual(
+    blocks.map((b) => b.type),
+    ["para", "para", "para", "break", "break", "break"],
+  );
+});
+
+test("long unnamed parts are recognised as parts, not chapters", () => {
+  const ch = (t: string) => `<h2>${t}</h2><p>${prose(4000)}</p>`;
+  const html = `<h1>The Fall</h1>${ch("One")}${ch("Two")}${ch("Three")}${ch("Four")}<h1>The Rise</h1>${ch("Five")}${ch("Six")}${ch("Seven")}${ch("Eight")}`;
+  const titles = chaptersFromBlocks(blocksFromHtml(html))!.map((c) => c.title);
+  assert.deepEqual(titles, ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"]);
+});

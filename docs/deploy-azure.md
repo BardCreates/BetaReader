@@ -80,4 +80,5 @@ Then update `APP_URL`, `AUTH_URL`, the OAuth callbacks and the Stripe webhook to
 - **Logs:** `az containerapp logs show -g readthrough-rg -n readthrough-worker --follow` (or `-web`).
 - **More reading capacity:** raise `JOBS_CONCURRENCY` or the worker's replica count. Jobs are claimed with `SKIP LOCKED`, so several workers share the queue safely, and one book is never read twice at once.
 - **Stuck or failed jobs:** the `Job` table shows each job's status, attempts and last error. Failed jobs are kept for 30 days.
+- **Free sample reads:** turn on the bot check before launch (`NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` from a free Cloudflare Turnstile widget). Per-visitor limits use the address Container Apps' proxy appends to `X-Forwarded-For`; if you put another proxy or CDN in front, make sure it appends rather than replaces it.
 - **Costs:** `AI_DAILY_BUDGET_USD` pauses all new AI work for the day once reached; `TRIAL_DAILY_BUDGET_USD` and `TRIAL_DAILY_LIMIT` cap free sample reads separately. Every call is logged with its cost in `AiUsage`.

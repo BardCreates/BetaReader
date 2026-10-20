@@ -53,11 +53,14 @@ export async function currentSnapshot(manuscriptId: string): Promise<SnapshotDat
 }
 
 /**
- * Keep how the read stands before it's replaced (a revised draft coming in, or a fresh read
- * starting over). Skipped when nothing has been read yet, since there'd be nothing to compare.
+ * The write that keeps how the read stands before it's replaced (a revised draft coming in, or
+ * a fresh read starting over), to run in the same transaction as the change itself so a failed
+ * change never leaves a snapshot behind. Null when nothing has been read yet.
  */
-export async function keepSnapshot(manuscriptId: string, reason: "reimport" | "fresh_read") {
+export async function snapshotWrite(manuscriptId: string, reason: "reimport" | "fresh_read") {
   const data = await currentSnapshot(manuscriptId);
   if (!data || !data.chapters.some((c) => c.read || c.stale)) return null;
-  return db.draftSnapshot.create({ data: { manuscriptId, draft: data.draft, reason, data } });
+  // Wrapped: a Prisma query runs as soon as it's awaited, and returning it from an async
+  // function would await it here, outside the caller's transaction.
+  return { op: db.draftSnapshot.create({ data: { manuscriptId, draft: data.draft, reason, data } }) };
 }

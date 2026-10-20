@@ -9,7 +9,7 @@
  */
 import "dotenv/config";
 import { runJobsLoop } from "@/lib/jobs/runner";
-import { workerId } from "@/lib/jobs/queue";
+import { requeueMine, workerId } from "@/lib/jobs/queue";
 import { db } from "@/lib/db";
 
 let stopping = false;
@@ -21,7 +21,11 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     stopping = true;
     // Finish the jobs in hand; anything cut off is retried by another worker later.
     console.log(`worker: ${signal}, finishing current jobs…`);
-    setTimeout(() => process.exit(0), Number(process.env.JOBS_SHUTDOWN_GRACE_MS ?? 25_000)).unref();
+    setTimeout(async () => {
+      // Out of time: put unfinished jobs back so another worker starts them now, not in minutes.
+      await requeueMine().catch(() => {});
+      process.exit(0);
+    }, Number(process.env.JOBS_SHUTDOWN_GRACE_MS ?? 25_000)).unref();
   });
 }
 

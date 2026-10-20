@@ -76,7 +76,8 @@ export default function PrivacyPage() {
         usage are kept only as anonymous cost totals, with nothing that links them to you or your writing. Encrypted backups kept by our database provider are overwritten on their normal schedule, after which nothing remains.
       </p>
       <p>
-        You can also download a copy of everything you’ve given us and everything the reader made, as a single file, from the account page.
+        You can also download a copy of everything you’ve given us and everything the reader made, as a single file, from the account page
+        (character pictures aside: they’re yours already).
       </p>
 
       <h2>Contact</h2>

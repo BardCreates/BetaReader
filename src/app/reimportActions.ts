@@ -13,7 +13,7 @@ import { countWords } from "@/lib/manuscript/split";
 import { planFor } from "@/lib/plans";
 import { remaining } from "@/lib/billing/period";
 import { getUsage } from "@/lib/billing/usage";
-import { keepSnapshot } from "@/lib/reader/draftHistory";
+import { snapshotWrite } from "@/lib/reader/draftHistory";
 import { scheduleJob } from "@/lib/jobs/schedule";
 import { MIN_WORDS_TO_READ, claimManuscript } from "@/lib/reader/pipeline";
 
@@ -86,12 +86,12 @@ export async function reimportDraft(manuscriptId: string, _prev: ReimportState, 
     };
   }
 
-  // Keep how the read of this draft stood, so the next read can be compared with it.
-  await keepSnapshot(ms.id, "reimport");
-
   const now = new Date();
   const byId = new Map(ms.chapters.map((c) => [c.id, c]));
   const ops: Prisma.PrismaPromise<unknown>[] = [];
+  // Keep how the read of this draft stood, so the next read can be compared with it.
+  const snapshot = await snapshotWrite(ms.id, "reimport");
+  if (snapshot) ops.push(snapshot.op);
 
   // 1. Drop removed chapters, and park the rest on temporary indexes so renumbering can't clash.
   const removed = changes.flatMap((c) => (c.kind === "removed" ? [c.id] : []));

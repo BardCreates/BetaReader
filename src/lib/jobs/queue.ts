@@ -32,14 +32,22 @@ export async function enqueue(kind: JobKind, payload: Prisma.InputJsonValue, opt
  * heartbeating. Returns null when there's nothing to do.
  */
 export async function claimNext(): Promise<JobRow | null> {
-  const stale = new Date(Date.now() - JOB_STALE_MS);
+  // Times are passed in from here, never Postgres now(): the columns are UTC timestamps without
+  // a zone, and now() would be read in the database session's time zone.
+  const now = new Date();
+  const stale = new Date(now.getTime() - JOB_STALE_MS);
+  // A job whose worker keeps dying (it crashes the process every time) stops being retried.
+  await db.job.updateMany({
+    where: { status: "running", lockedAt: { lt: stale }, attempts: { gte: MAX_ATTEMPTS } },
+    data: { status: "failed", lockedAt: null, error: "The worker stopped while running this job, too many times." },
+  });
   const rows = await db.$queryRaw<JobRow[]>`
-    UPDATE "Job" SET status = 'running', "lockedAt" = now(), "lockedBy" = ${workerId},
-      attempts = attempts + 1, "updatedAt" = now()
+    UPDATE "Job" SET status = 'running', "lockedAt" = ${now}, "lockedBy" = ${workerId},
+      attempts = attempts + 1, "updatedAt" = ${now}
     WHERE id = (
       SELECT id FROM "Job"
-      WHERE (status = 'queued' AND "runAt" <= now())
-         OR (status = 'running' AND "lockedAt" < ${stale})
+      WHERE (status = 'queued' AND "runAt" <= ${now})
+         OR (status = 'running' AND "lockedAt" < ${stale} AND attempts < ${MAX_ATTEMPTS})
       ORDER BY "runAt" ASC
       LIMIT 1
       FOR UPDATE SKIP LOCKED
@@ -48,8 +56,10 @@ export async function claimNext(): Promise<JobRow | null> {
   return rows[0] ?? null;
 }
 
+/** Refresh the job's lock. False means another worker has taken it over (this one stalled). */
 async function heartbeat(id: string) {
-  await db.job.updateMany({ where: { id, lockedBy: workerId, status: "running" }, data: { lockedAt: new Date() } });
+  const { count } = await db.job.updateMany({ where: { id, lockedBy: workerId, status: "running" }, data: { lockedAt: new Date() } });
+  return count === 1;
 }
 
 async function finish(id: string, error: string | null, attempts: number) {
@@ -66,16 +76,27 @@ async function finish(id: string, error: string | null, attempts: number) {
   });
 }
 
-export type Handler = (payload: unknown, job: JobRow) => Promise<void>;
+/** `signal` aborts when this worker loses the job to another: stop at the next safe point, quietly. */
+export type Handler = (payload: unknown, job: JobRow, signal: AbortSignal) => Promise<void>;
 
 /** Run one claimed job with a heartbeat, recording the outcome. */
 export async function runJob(job: JobRow, handlers: Record<JobKind, Handler>) {
-  const timer = setInterval(() => heartbeat(job.id).catch(() => {}), HEARTBEAT_MS);
+  const lost = new AbortController();
+  const timer = setInterval(() => {
+    heartbeat(job.id)
+      .then((ok) => {
+        if (!ok && !lost.signal.aborted) {
+          console.warn(`job ${job.id}: lock lost to another worker, stopping`);
+          lost.abort();
+        }
+      })
+      .catch(() => {});
+  }, HEARTBEAT_MS);
   let error: string | null = null;
   try {
     const handler = handlers[job.kind];
     if (!handler) throw new Error(`Unknown job kind: ${job.kind}`);
-    await handler(job.payload, job);
+    await handler(job.payload, job, lost.signal);
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
     console.error(`job ${job.kind} ${job.id} failed (attempt ${job.attempts})`, err);
@@ -98,6 +119,11 @@ export async function drain(handlers: Record<JobKind, Handler>, concurrency = 1,
   };
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, lane));
   return ran;
+}
+
+/** On shutdown: hand this worker's unfinished jobs straight back to the queue. */
+export async function requeueMine() {
+  await db.job.updateMany({ where: { lockedBy: workerId, status: "running" }, data: { status: "queued", lockedAt: null, lockedBy: null } });
 }
 
 /** Finished jobs are only useful for a while; failed ones are kept longer for debugging. */

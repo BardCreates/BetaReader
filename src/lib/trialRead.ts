@@ -48,12 +48,10 @@ export function trialDailyLimit() {
 }
 
 /** Why this visitor can't start a sample read right now, or null if they can. */
-export async function trialRefusal(ipHash: string): Promise<string | null> {
+export async function trialRefusal(ipHash: string, client: Pick<typeof db, "trialRead"> = db): Promise<string | null> {
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const [mine, all] = await Promise.all([
-    db.trialRead.count({ where: { ipHash, createdAt: { gte: dayAgo } } }),
-    db.trialRead.count({ where: { createdAt: { gte: dayAgo } } }),
-  ]);
+  const mine = await client.trialRead.count({ where: { ipHash, createdAt: { gte: dayAgo } } });
+  const all = await client.trialRead.count({ where: { createdAt: { gte: dayAgo } } });
   if (mine >= TRIAL_PER_VISITOR) {
     return `You’ve had ${TRIAL_PER_VISITOR} free sample reads today. Sign up free to keep going: your first chapters are on us.`;
   }

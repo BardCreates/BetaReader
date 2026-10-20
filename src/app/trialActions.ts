@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { LOCK_TRIAL_CREATE } from "@/lib/billing/usage";
 import { scheduleJob } from "@/lib/jobs/schedule";
 import { canonicalText } from "@/lib/manuscript/match";
 import { importFile } from "@/lib/manuscript/import";
@@ -23,7 +24,10 @@ const Form = z.object({
 /** The visitor's address as the hosting proxy reports it (Azure and most hosts set X-Forwarded-For). */
 async function visitorAddress() {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || h.get("x-azure-clientip") || "unknown";
+  // The right-most entry is the one our own proxy added; anything to its left came from the
+  // client and can be made up, so it's never used for limits.
+  const forwarded = h.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean);
+  return forwarded?.at(-1) || h.get("x-real-ip") || "unknown";
 }
 
 /** Optional bot check: on when TURNSTILE_SECRET_KEY is set (Cloudflare Turnstile). */
@@ -76,13 +80,19 @@ export async function startTrialRead(_prev: TrialFormState, form: FormData): Pro
   const ip = await visitorAddress();
   if (!(await passesBotCheck(form.get("cf-turnstile-response"), ip))) return { error: "Please complete the check and try again." };
   const ipHash = hashVisitor(ip);
-  const refusal = await trialRefusal(ipHash);
-  if (refusal) return { error: refusal };
-
-  const trial = await db.trialRead.create({
-    data: { ipHash, title: title || null, genre: parsed.data.genre || null, midBook: parsed.data.midBook, content, wordCount: words },
-    select: { id: true },
+  // Check the limits and record the read together, one visitor at a time, so a burst of
+  // submissions can't slip past them.
+  const outcome = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LOCK_TRIAL_CREATE})`;
+    const refusal = await trialRefusal(ipHash, tx);
+    if (refusal) return { error: refusal } as const;
+    return tx.trialRead.create({
+      data: { ipHash, title: title || null, genre: parsed.data.genre || null, midBook: parsed.data.midBook, content, wordCount: words },
+      select: { id: true },
+    });
   });
+  if ("error" in outcome) return { error: outcome.error };
+  const trial = outcome;
   await scheduleJob("trial_read", { trialId: trial.id });
   redirect(`/try/${trial.id}`);
 }

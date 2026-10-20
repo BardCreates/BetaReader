@@ -165,7 +165,7 @@ async function assertCapacity() {
 export type Meter = { userId: string | null; kind?: string; manuscriptId?: string | null };
 
 /** A worst-case cost held against the spend ceiling while an AI call runs. */
-export type CostHold = { userId: string | null; micros: number; fromPass: number; periodStart: Date };
+export type CostHold = { userId: string | null; micros: number; fromPass: number; periodStart: Date; trialUsageId?: string };
 
 // ─── Sample reads (no account) ──────────────────────────────────
 
@@ -175,20 +175,26 @@ export function trialBudgetMicros() {
   return Number.isFinite(usd) && usd >= 0 ? Math.round(usd * 1_000_000) : 10_000_000;
 }
 
-/** Sample reads have no account to bill, so they share one small daily budget (plus holds in flight). */
-let trialHeldMicros = 0;
-export async function trialSpentTodayMicros() {
-  const since = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
-  const agg = await db.aiUsage.aggregate({ where: { userId: null, kind: "trial", createdAt: { gte: since } }, _sum: { costMicros: true } });
-  return agg._sum.costMicros ?? 0;
-}
+/** Postgres advisory lock keys, so checks and writes on shared budgets happen one at a time. */
+export const LOCK_TRIAL_BUDGET = 72_011;
+export const LOCK_TRIAL_CREATE = 72_012;
 
+/**
+ * Sample reads have no account to bill, so they share one small daily budget. A hold is written
+ * as an AiUsage row at its worst-case cost straight away (under a lock, so every worker sees it)
+ * and corrected to the real cost when the call settles.
+ */
 async function holdTrialCost(micros: number): Promise<CostHold> {
-  if ((await trialSpentTodayMicros()) + trialHeldMicros + micros > trialBudgetMicros()) {
-    throw new LimitError("Free sample reads are full for today. Try again tomorrow, or sign up free to read your opening chapters now.", "CAPACITY");
-  }
-  trialHeldMicros += micros;
-  return { userId: null, micros, fromPass: 0, periodStart: new Date(0) };
+  return db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LOCK_TRIAL_BUDGET})`;
+    const since = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+    const agg = await tx.aiUsage.aggregate({ where: { userId: null, kind: "trial", createdAt: { gte: since } }, _sum: { costMicros: true } });
+    if ((agg._sum.costMicros ?? 0) + micros > trialBudgetMicros()) {
+      throw new LimitError("Free sample reads are full for today. Try again tomorrow, or sign up free to read your opening chapters now.", "CAPACITY");
+    }
+    const row = await tx.aiUsage.create({ data: { userId: null, kind: "trial", model: "pending", costMicros: micros }, select: { id: true } });
+    return { userId: null, micros, fromPass: 0, periodStart: new Date(0), trialUsageId: row.id };
+  });
 }
 
 /** Worst case for a call: every prompt character a token (well over the real ~4 chars/token is fine), full output. */
@@ -220,12 +226,11 @@ export async function settleCost(hold: CostHold, meter: Meter, model: string, us
   const actual = usage ? costMicros(model, usage) : 0;
   const holder = hold.userId;
   if (holder === null) {
-    trialHeldMicros = Math.max(0, trialHeldMicros - hold.micros);
-    if (usage) {
-      await db.aiUsage.create({
+    // Replace the held row with the real cost, or remove it if the call used nothing.
+    if (hold.trialUsageId && usage) {
+      await db.aiUsage.update({
+        where: { id: hold.trialUsageId },
         data: {
-          userId: null,
-          kind: meter.kind ?? "trial",
           model,
           inputTokens: usage.input,
           outputTokens: usage.output,
@@ -234,6 +239,8 @@ export async function settleCost(hold: CostHold, meter: Meter, model: string, us
           costMicros: actual,
         },
       });
+    } else if (hold.trialUsageId) {
+      await db.aiUsage.deleteMany({ where: { id: hold.trialUsageId } });
     }
     if (budgetCache) budgetCache.micros += actual;
     return actual;
