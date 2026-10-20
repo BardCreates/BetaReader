@@ -8,6 +8,8 @@ import { buttonClass, Card, ghostButtonClass } from "@/components/ui";
 import { usageSummary } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
 import { getSidebar } from "@/lib/sidebar";
+import { BOOK_PASS } from "@/lib/plans";
+import { FEATURES } from "@/lib/features";
 
 export const metadata = { title: "Account" };
 
@@ -88,7 +90,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <Meter label={`Words read${per}`} m={usage.words} />
             <Meter label={`Grammar & style${per}`} m={usage.grammarWords} unit="words" />
             <Meter label={`Character chat${per}`} m={usage.chat} unit="messages" />
-            <Meter label={`Pitch kits${per}`} m={usage.pitchKits} />
+            {FEATURES.pitchKit && <Meter label={`Pitch kits${per}`} m={usage.pitchKits} />}
           </div>
           {usage.spendBlocked && (
             <p className="mt-5 rounded-lg bg-issue-soft px-3 py-2 text-sm text-issue">
@@ -103,7 +105,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <p className="mt-0.5 text-sm text-muted">
               {usage.words.pass > 0
                 ? `You have ${fmt(usage.words.pass)} words of pass credit. It never expires and is used after your plan’s allowance.`
-                : "A full read of a novel and a pitch kit for $29, on any plan. Never expires."}
+                : `A full read of a novel${FEATURES.pitchKit ? " and a pitch kit" : ""} for $${BOOK_PASS.price}, on any plan. Never expires.`}
             </p>
           </div>
           <form action={startCheckout.bind(null, "pass")}>

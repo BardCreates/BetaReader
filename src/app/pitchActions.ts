@@ -6,12 +6,14 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/auth";
 import { isLimitError, reserve, type Reservation } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
+import { FEATURES } from "@/lib/features";
 import { STALE_READ_MS } from "@/lib/reader/pipeline";
 import { writePitchKit } from "@/lib/reader/pitch";
 
 /** Write (or rewrite) the pitch kit. Needs a finished read, since it's built from the reader's notes. */
 export async function generatePitchKit(manuscriptId: string) {
   const user = await requireUser();
+  if (!FEATURES.pitchKit) return;
   const ms = await db.manuscript.findFirst({
     where: { id: manuscriptId, userId: user.id },
     select: { id: true, report: { select: { status: true } }, pitchKit: { select: { status: true, updatedAt: true } } },

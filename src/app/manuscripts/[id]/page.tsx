@@ -201,11 +201,13 @@ export default async function ManuscriptPage({
                 {FEATURES.characterChat && (
                   <Tool href={`${base}/characters`} title="Characters" detail={ms._count.characters ? `${ms._count.characters} to talk to` : "Find them in your manuscript"} />
                 )}
-                <Tool
-                  href={`${base}/pitch`}
-                  title="Pitch kit"
-                  detail={ms.pitchKit?.status === "DONE" ? "Logline, blurb, synopsis, query" : report ? "Ready to write" : "After a full read"}
-                />
+                {FEATURES.pitchKit && (
+                  <Tool
+                    href={`${base}/pitch`}
+                    title="Pitch kit"
+                    detail={ms.pitchKit?.status === "DONE" ? "Logline, blurb, synopsis, query" : report ? "Ready to write" : "After a full read"}
+                  />
+                )}
                 <Tool href={`${base}/update`} title="Update from new draft" detail="Upload a fresh export from Dabble or Word" />
               </ul>
             </Card>

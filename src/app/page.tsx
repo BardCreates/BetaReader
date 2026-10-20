@@ -154,7 +154,6 @@ export default async function Home() {
               ["Notes on the page", "Reactions, praise and problems anchored to the exact passage, each problem with a concrete way to fix it. Mark them fixed as you go."],
               ["A story bible", "The facts your book establishes, gathered as it reads: who’s who, injuries, ages, places, timeline and the rules of your world."],
               ["Three kinds of reader", "Choose a devoted genre reader, a developmental editor for structure and stakes, or a line editor for voice and prose."],
-              ["A pitch kit", "A logline, back-cover blurb, synopsis and query letter drafted from how the book actually read, plus what made it hard to pitch."],
               ["A place to write", "A clean editor with your chapters in a book outline, the reader’s notes beside the text, and grammar and style suggestions when you want them."],
             ].map(([t, d]) => (
               <div key={t} className="border-l-2 border-line pl-5">

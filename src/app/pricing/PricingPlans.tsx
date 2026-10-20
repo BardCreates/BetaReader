@@ -6,6 +6,7 @@ import { startCheckout } from "@/app/billingActions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { buttonClass, ghostButtonClass } from "@/components/ui";
 import { BOOK_PASS, PLANS, yearlySavingPct, type Plan } from "@/lib/plans";
+import { FEATURES } from "@/lib/features";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -18,7 +19,7 @@ function features(plan: Plan): string[] {
       : `${fmt(a.words)} words read${per}${plan.id === "author" ? ": a full novel, or many rounds of revision" : ""}`,
     `Grammar & style on ${fmt(a.grammarWords)} words${per}`,
     `${fmt(a.chat)} character chat messages${per}`,
-    `${a.pitchKits} pitch kit${a.pitchKits === 1 ? "" : "s"}${per}`,
+    ...(FEATURES.pitchKit ? [`${a.pitchKits} pitch kit${a.pitchKits === 1 ? "" : "s"}${per}`] : []),
     `${plan.maxManuscripts} manuscript${plan.maxManuscripts === 1 ? "" : "s"}, up to ${fmt(plan.maxWordsPerManuscript)} words each`,
   ];
 }
@@ -104,8 +105,8 @@ export function PricingPlans(props: { loggedIn: boolean; currentPlan: string | n
             {BOOK_PASS.name} <span className="ml-1 font-sans text-base font-normal text-muted">${BOOK_PASS.price} once</span>
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Just finished a draft and don’t want a subscription? A pass adds {fmt(BOOK_PASS.credit.words)} words of reading (a full novel), a pitch
-            kit, and some grammar checks and character chat. It never expires and works on any plan, including Free.
+            Just finished a draft and don’t want a subscription? A pass adds {fmt(BOOK_PASS.credit.words)} words of reading (a full novel){FEATURES.pitchKit ? ", a pitch kit," : ""}
+            and some grammar checks and character chat. It never expires and works on any plan, including Free.
           </p>
         </div>
         {props.loggedIn ? (
