@@ -44,12 +44,15 @@ export function PublicFooter() {
           <Logo size="sm" />
           <span className="hidden sm:inline">{BRAND.tagline}</span>
         </div>
-        <nav className="flex gap-5">
+        <nav className="flex flex-wrap gap-x-5 gap-y-2">
           <Link href="/pricing" className="hover:text-ink">
             Pricing
           </Link>
-          <Link href="/signin" className="hover:text-ink">
-            Sign in
+          <Link href="/privacy" className="hover:text-ink">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-ink">
+            Terms
           </Link>
           <span>© {new Date().getFullYear()} {BRAND.name}</span>
         </nav>

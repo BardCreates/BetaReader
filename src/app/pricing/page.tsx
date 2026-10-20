@@ -2,6 +2,7 @@ import { PublicFooter, PublicHeader } from "@/components/PublicChrome";
 import { auth } from "@/auth";
 import { billingEnabled } from "@/lib/billing/stripe";
 import { db } from "@/lib/db";
+import { TrustBlock } from "@/components/TrustBlock";
 import { PricingPlans } from "./PricingPlans";
 
 export const metadata = { title: "Pricing" };
@@ -50,6 +51,8 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
           <p className="mt-2 text-muted">Same monthly allowance, billed once a year for about a third off. Cancel any time.</p>
         </div>
       </section>
+
+      <TrustBlock />
     </main>
     <PublicFooter />
     </div>

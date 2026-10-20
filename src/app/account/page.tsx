@@ -9,6 +9,8 @@ import { usageSummary } from "@/lib/billing/usage";
 import { db } from "@/lib/db";
 import { getSidebar } from "@/lib/sidebar";
 import { BOOK_PASS } from "@/lib/plans";
+import { MODEL_VENDOR } from "@/lib/trust";
+import { DeleteAccountForm } from "./DeleteAccountForm";
 import { FEATURES } from "@/lib/features";
 
 export const metadata = { title: "Account" };
@@ -25,6 +27,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       wordsReadTotal: true,
       createdAt: true,
       stripeCustomerId: true,
+      stripeSubscriptionId: true,
       subscriptionStatus: true,
       billingInterval: true,
       cancelAtPeriodEnd: true,
@@ -129,6 +132,22 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <p className="mt-2 text-sm text-muted">{fmt(account.wordsReadTotal)} words read in total</p>
           </Card>
         </div>
+
+        <Card className="mt-4">
+          <p className="font-medium">Your data</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            Your manuscripts are private to you, encrypted, and never used to train AI: not by us, and not by {MODEL_VENDOR.company}, who make the
+            reader. <Link href="/privacy" className="text-accent underline">How your writing is handled</Link>.
+          </p>
+          <div className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-3">
+            <a href="/api/account/export" className={ghostButtonClass} download>
+              Download all my data
+            </a>
+            <div className="pt-1.5">
+              <DeleteAccountForm hasSubscription={!!account.stripeSubscriptionId && account.subscriptionStatus !== "canceled"} />
+            </div>
+          </div>
+        </Card>
 
         <form action={signOutAction} className="mt-8">
           <button className={ghostButtonClass}>Sign out</button>

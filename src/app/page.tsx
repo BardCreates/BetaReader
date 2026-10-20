@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { PublicFooter, PublicHeader } from "@/components/PublicChrome";
+import { TrustBlock } from "@/components/TrustBlock";
 import { buttonClass, ghostButtonClass } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { BOOK_PASS, PLANS } from "@/lib/plans";
 
 export const metadata = { title: { absolute: `${BRAND.name}: an honest first reader for your manuscript` } };
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const signedIn = !!(await auth())?.user;
+  const deleted = (await searchParams).deleted === "1";
   const start = signedIn ? "/dashboard" : "/signin";
   const startLabel = signedIn ? "Open your manuscripts" : "Start your first read";
   const fmt = (n: number) => n.toLocaleString("en-US");
@@ -16,6 +18,13 @@ export default async function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       <PublicHeader signedIn={signedIn} />
+      {deleted && (
+        <p className="mx-auto mt-2 w-full max-w-6xl px-4 sm:px-8" role="status">
+          <span className="block rounded-lg bg-praise-soft px-4 py-2.5 text-sm text-praise">
+            Your account and everything in it have been deleted.
+          </span>
+        </p>
+      )}
 
       <main className="flex-1">
         {/* Hero: the promise, and a page the reader has marked up. */}
@@ -232,6 +241,10 @@ export default async function Home() {
             </div>
           </div>
         </section>
+
+        <div className="mx-auto max-w-6xl px-4 sm:px-8">
+          <TrustBlock />
+        </div>
 
         <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-8">
           {/* The brand's ink blue in both themes, like the mark. */}
