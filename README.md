@@ -2,6 +2,17 @@
 
 An AI beta reader and developmental editor for authors. Upload a manuscript and it reads the book **in order, chapter by chapter**, the way a real first reader would: where it was hooked, where it drifted, what confused it, what it's dying to know. Every reaction and issue is anchored to the exact passage, with a concrete suggestion for the fix. When it finishes, it writes a whole-book editorial letter and revision plan. Revise a chapter in the app and it's re-read with the memory of everything before it.
 
+> **About this repository.** Readthrough is designed, built and maintained by [Hannah Nicholls](https://www.linkedin.com/in/hannah-nicholls-6126b3150) using agentic AI-assisted development (Claude Code; the repo's `CLAUDE.md` holds the conventions the agent works under). The source is published so it can be reviewed; it is **not open source** — see [LICENSE](LICENSE).
+
+**Engineering highlights**
+
+- A multi-step LLM pipeline that reads strictly in order, passing a rolling "reader memory" as the only context between chapters (`src/lib/reader/pipeline.ts`).
+- Structured outputs validated with zod and mirrored JSON schemas (`src/lib/reader/schemas.ts`, `src/lib/reader/structured.ts`).
+- Fuzzy passage anchoring so every model quote lands on the exact text, robust to curly quotes, dashes, whitespace and ellipses (`src/lib/manuscript/anchor.ts`).
+- Per-call token-cost metering (including prompt-cache pricing), allowances reserved in row-locked transactions before any AI call, per-user spend ceilings and an app-wide daily budget (`src/lib/billing`).
+- Stripe subscriptions and one-off passes with an idempotent, order-independent webhook.
+- Unit tests for the parts that are easy to get subtly wrong: chapter splitting, quote anchoring, draft matching, schema conversion and cost math (`npm test`).
+
 ## Brand
 
 The product is called **Readthrough** (the repository keeps its original name). The name and tagline live in `src/lib/brand.ts`; the logo mark (a manuscript page with a red margin bar beside one line) is `src/components/Logo.tsx`, with the favicon in `src/app/icon.svg`. Colours and type are tokens in `src/app/globals.css`: ink blue on a cool paper white, with the editor's red pen (`--color-pen`) used only where something is marked. Headings and prose are set in Literata; the interface in Source Sans 3.
@@ -18,7 +29,7 @@ upload (.docx/.txt/.md or paste)
 ```
 
 - **Reader memory.** After each chapter the model writes a ~400-word memory of the story so far, which is all it "remembers" going into the next chapter. That's what lets it notice dropped threads, unpaid setups and real confusion, instead of reading with hindsight.
-- **Structured output.** Each read is forced through a tool call (`submit_chapter_read`, `submit_book_report`) and validated with zod (`src/lib/reader/schemas.ts`).
+- **Structured output.** Each read uses the API's structured outputs (`output_config.format`, see `callStructured` in `src/lib/reader/anthropic.ts`) and is validated with zod (`src/lib/reader/schemas.ts`).
 - **Anchored notes.** The model quotes passages; `src/lib/manuscript/anchor.ts` finds them in the text, tolerating curly/straight quotes, dashes, whitespace and ellipses, so they can be highlighted inline.
 - **Personas.** Genre reader, developmental editor, or line editor (`src/lib/reader/personas.ts`). Same honesty rules, different lens.
 - **Reader journey.** Every question and prediction the reader carries is tracked from the chapter it came up in to the chapter that settled it (`ReaderThread`). The journey page shows what was never answered, which twists were seen coming, and which surprised them.
@@ -59,7 +70,7 @@ Run `npm run update`. It installs any new packages, applies new database migrati
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | Start the dev server |
-| `npm test` | Unit tests (chapter splitting, quote anchoring) |
+| `npm test` | Unit tests (chapter splitting, quote anchoring, draft matching, schemas, billing math) |
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build |
 | `npm run db:migrate` | Create/apply a Prisma migration in development |
@@ -71,7 +82,6 @@ Run `npm run update`. It installs any new packages, applies new database migrati
 ```
 prisma/schema.prisma            data model (client is generated into src/generated/prisma)
 prisma.config.ts                Prisma CLI config (reads DATABASE_URL from .env)
-, manuscripts, chapters, reviews, notes, report, conversations
 src/auth.ts                     Auth.js config + requireUser()
 src/app/actions.ts              server actions: upload, start reading, revise chapter, note status, delete
 src/app/api/manuscripts/[id]/chat/route.ts   streaming editor chat
