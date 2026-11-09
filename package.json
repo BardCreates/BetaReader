@@ -10,12 +10,14 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test": "tsx --test \"src/**/*.test.ts\" \"evals/**/*.test.ts\"",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "update": "npm install && prisma migrate deploy && prisma generate"
+    "update": "npm install && prisma migrate deploy && prisma generate",
+    "eval": "tsx evals/run.ts",
+    "eval:compare": "tsx evals/compare.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
