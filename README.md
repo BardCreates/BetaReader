@@ -1,3 +1,7 @@
+
+
+Uploading Readthrough_crf28.mp4…
+
 # Readthrough
 
 An AI beta reader and developmental editor for authors. Upload a manuscript and it reads the book **in order, chapter by chapter**, the way a real first reader would: where it was hooked, where it drifted, what confused it, what it's dying to know. Every reaction and issue is anchored to the exact passage, with a concrete suggestion for the fix. When it finishes, it writes a whole-book editorial letter and revision plan. Revise a chapter in the app and it's re-read with the memory of everything before it.
