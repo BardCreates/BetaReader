@@ -1,10 +1,10 @@
-
-
-Uploading Readthrough_crf28.mp4…
-
 # Readthrough
 
 An AI beta reader and developmental editor for authors. Upload a manuscript and it reads the book **in order, chapter by chapter**, the way a real first reader would: where it was hooked, where it drifted, what confused it, what it's dying to know. Every reaction and issue is anchored to the exact passage, with a concrete suggestion for the fix. When it finishes, it writes a whole-book editorial letter and revision plan. Revise a chapter in the app and it's re-read with the memory of everything before it.
+
+**Walkthrough** (3:25, narrated): a real read of a short sample manuscript written for the demo, including the continuity catch, a re-read after a fix, and character chat.
+
+https://github.com/user-attachments/assets/86c515cc-a880-44fe-a0bb-ac79a557ff7b
 
 > **About this repository.** Readthrough is designed, built and maintained by [Hannah Nicholls](https://www.linkedin.com/in/hannah-nicholls-6126b3150) using agentic AI-assisted development (Claude Code; the repo's `CLAUDE.md` holds the conventions the agent works under). The source is published so it can be reviewed; it is **not open source** — see [LICENSE](LICENSE).
 
